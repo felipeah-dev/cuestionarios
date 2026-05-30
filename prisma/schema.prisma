@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────
+
+enum Rol {
+  ADMIN
+  USUARIO
+}
+
+enum TipoPregunta {
+  OPCION_MULTIPLE
+  ABIERTA
+}
+
+enum EstadoIntento {
+  EN_PROGRESO  // El usuario está respondiendo
+  ENVIADO      // El usuario entregó, pendiente de calificar preguntas abiertas
+  CALIFICADO   // Todas las preguntas están calificadas, calificacion final guardada
+}
+
+// ─────────────────────────────────────────
+// MODELOS
+// ─────────────────────────────────────────
+
+// Todos los usuarios del sistema: admins y usuarios regulares
+model Usuario {
+  id         String   @id @default(cuid())
+  nombre     String
+  email      String   @unique
+  password   String
+  rol        Rol      @default(USUARIO)
+  creadoEn   DateTime @default(now())
+
+  // Relaciones
+  cuestionarios Cuestionario[] // Cuestionarios que creó (solo admins)
+  intentos      Intento[]      // Intentos de cuestionarios (solo usuarios regulares)
+}
+
+// Cuestionario creado por un administrador
+model Cuestionario {
+  id          String   @id @default(cuid())
+  titulo      String
+  descripcion String?
+  adminId     String   // Admin que creó el cuestionario
+  creadoEn    DateTime @default(now())
+
+  // Relaciones
+  admin     Usuario    @relation(fields: [adminId], references: [id])
+  preguntas Pregunta[]
+  intentos  Intento[]
+}
+
+// Pregunta dentro de un cuestionario
+// Puede ser de opción múltiple o abierta
+model Pregunta {
+  id             String       @id @default(cuid())
+  cuestionarioId String
+  texto          String
+  tipo           TipoPregunta
+  puntos         Float        // Puntaje máximo que vale esta pregunta
+  orden          Int          // Orden de aparición en el cuestionario
+
+  // Relaciones
+  cuestionario Cuestionario @relation(fields: [cuestionarioId], references: [id])
+  opciones     Opcion[]     // Solo aplica si tipo = OPCION_MULTIPLE
+  respuestas   Respuesta[]
+}
+
+// Opciones de respuesta para preguntas de opción múltiple
+// Una sola opción por pregunta tiene esCorrecta = true
+model Opcion {
+  id         String  @id @default(cuid())
+  preguntaId String
+  texto      String
+  esCorrecta Boolean @default(false)
+
+  // Relaciones
+  pregunta   Pregunta    @relation(fields: [preguntaId], references: [id])
+  respuestas Respuesta[]
+}
+
+// Representa una sesión de un usuario respondiendo un cuestionario
+// calificacion se guarda aquí como desnormalización controlada para el reporte de gráfica
+model Intento {
+  id             String        @id @default(cuid())
+  cuestionarioId String
+  usuarioId      String
+  calificacion   Float?        // 0-100, se calcula y guarda al completar la calificación
+  estado         EstadoIntento @default(EN_PROGRESO)
+  creadoEn       DateTime      @default(now())
+  enviadoEn      DateTime?     // Cuando el usuario entregó
+  calificadoEn   DateTime?     // Cuando quedó completamente calificado
+
+  // Relaciones
+  cuestionario Cuestionario @relation(fields: [cuestionarioId], references: [id])
+  usuario      Usuario      @relation(fields: [usuarioId], references: [id])
+  respuestas   Respuesta[]
+}
+
+// Respuesta de un usuario a una pregunta dentro de un intento
+// - Si la pregunta es OPCION_MULTIPLE: se guarda opcionId, puntajeObtenido lo asigna el sistema
+// - Si la pregunta es ABIERTA: se guarda respuestaAbierta, puntajeObtenido lo asigna el admin
+// No se guarda esCorrecta aquí — se deriva comparando opcionId con Opcion.esCorrecta (3FN)
+model Respuesta {
+  id               String  @id @default(cuid())
+  intentoId        String
+  preguntaId       String
+  opcionId         String? // Solo para OPCION_MULTIPLE
+  respuestaAbierta String? // Solo para ABIERTA
+  puntajeObtenido  Float?  // null hasta que se califique
+
+  // Relaciones
+  intento  Intento  @relation(fields: [intentoId], references: [id])
+  pregunta Pregunta @relation(fields: [preguntaId], references: [id])
+  opcion   Opcion?  @relation(fields: [opcionId], references: [id])
+
+  // Evita que existan dos respuestas para la misma pregunta dentro del mismo intento
+  @@unique([intentoId, preguntaId])
+}
