@@ -5,6 +5,8 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admincito123
       POSTGRES_DB: cuestionarios_db
+      POSTGRES_HOST_AUTH_METHOD: md5
+      POSTGRES_INITDB_ARGS: "--auth-host=md5 --auth-local=md5"
     ports:
       - "5433:5432"
     volumes:
