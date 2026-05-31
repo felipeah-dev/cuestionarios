@@ -141,9 +141,9 @@ export default async function UsuarioDashboardPage() {
                         </span>
                       </span>
                     )}
-<Button variant="ghost" size="icon" render={<Link href={`/usuario/cuestionarios/${intento.cuestionarioId}/resultado`} />}>
+<Link href={`/usuario/cuestionarios/${intento.cuestionarioId}/resultado`} className="p-2 hover:bg-muted rounded-md transition-colors">
   <ArrowRight className="h-4 w-4" />
-</Button>
+</Link>
                   </div>
                 </CardContent>
               </Card>
@@ -166,14 +166,12 @@ export default async function UsuarioDashboardPage() {
               Ver todas las evaluaciones disponibles para ti
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            render={<Link href="/usuario/cuestionarios" />}
-            className="shrink-0 group-hover:text-primary group-hover:bg-primary/10 transition-colors"
-          >
-            <ArrowRight className="h-4 w-4" />
-          </Button>
+<Link
+  href="/usuario/cuestionarios"
+  className="shrink-0 p-2 hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
+>
+  <ArrowRight className="h-4 w-4" />
+</Link>
         </CardContent>
       </Card>
     </div>

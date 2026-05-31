@@ -45,9 +45,9 @@ export default async function ResultadoCuestionarioPage({ params }: Props) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-<Button variant="ghost" size="icon" render={<Link href="/usuario/cuestionarios" />}>
+<Link href="/usuario/cuestionarios" className="p-2 hover:bg-muted rounded-md transition-colors">
   <ArrowLeft className="h-4 w-4" />
-</Button>
+</Link>
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight">
             Resultado del Intento
