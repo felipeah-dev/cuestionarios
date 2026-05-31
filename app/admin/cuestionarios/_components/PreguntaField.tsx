@@ -139,12 +139,17 @@ export function PreguntaField({ index, onRemove }: Props) {
               );
             })}
 
-            {/* Error de opciones */}
-            {preguntaErrors?.opciones && !Array.isArray(preguntaErrors.opciones) && (
-              <p className="text-xs text-destructive">
-                {(preguntaErrors.opciones as { message?: string }).message}
-              </p>
-            )}
+            {/* Errores de opciones: texto vacío o sin correcta marcada */}
+            {(() => {
+              const err = preguntaErrors?.opciones as any;
+              const msg = err?.root?.message ?? err?.message;
+              if (!msg) return null;
+              return (
+                <p className="text-xs text-destructive font-medium bg-destructive/10 rounded-md px-3 py-2">
+                  ⚠ {msg}
+                </p>
+              );
+            })()}
 
             <Button
               type="button"

@@ -41,7 +41,7 @@ export type CuestionarioConPreguntas = {
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const OpcionInput = z.object({
-  texto: z.string().min(1, "El texto de la opción es requerido"),
+  texto: z.string(),
   esCorrecta: z.boolean(),
 });
 
@@ -58,6 +58,9 @@ const PreguntaInput = z
       const lista = val.opciones ?? [];
       if (lista.length < 2) {
         ctx.addIssue({ code: "custom", message: "Debe tener al menos 2 opciones", path: ["opciones"] });
+      }
+      if (lista.some((o) => !o.texto.trim())) {
+        ctx.addIssue({ code: "custom", message: "Todas las opciones deben tener texto", path: ["opciones"] });
       }
       const correctas = lista.filter((o) => o.esCorrecta).length;
       if (correctas !== 1) {

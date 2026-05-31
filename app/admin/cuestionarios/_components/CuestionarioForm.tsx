@@ -14,7 +14,7 @@ import type { CuestionarioFormValues } from "../_actions";
 // ─── Schema (espeja el de _actions para la validación cliente) ────────────────
 
 const OpcionInput = z.object({
-  texto: z.string().min(1, "Requerido"),
+  texto: z.string(),
   esCorrecta: z.boolean(),
 });
 
@@ -31,6 +31,8 @@ const PreguntaInput = z
       const lista = val.opciones ?? [];
       if (lista.length < 2)
         ctx.addIssue({ code: "custom", message: "Al menos 2 opciones", path: ["opciones"] });
+      if (lista.some((o) => !o.texto.trim()))
+        ctx.addIssue({ code: "custom", message: "Todas las opciones deben tener texto", path: ["opciones"] });
       if (lista.filter((o) => o.esCorrecta).length !== 1)
         ctx.addIssue({ code: "custom", message: "Marca exactamente una opción correcta", path: ["opciones"] });
     }

@@ -5,7 +5,7 @@ import { crearCuestionario } from "../_actions";
 
 export default function NuevoCuestionarioPage() {
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl mx-auto w-full">
       <div className="flex items-center gap-3">
         <Link
           href="/admin/cuestionarios"
