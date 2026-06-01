@@ -6,18 +6,20 @@ import { Button } from "@/components/ui/button";
 import { BookOpen, CheckCircle, ArrowRight, Clock, Trophy } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export default async function UsuarioDashboardPage() {
   const user = await getCurrentUser();
+  if (!user) redirect("/login");
 
   const [totalCuestionarios, totalIntentos, intentosRecientes] =
     await Promise.all([
       prisma.cuestionario.count(),
       prisma.intento.count({
-        where: { usuarioId: user?.id },
+        where: { usuarioId: user.id, estado: { in: ["ENVIADO", "CALIFICADO"] } },
       }),
       prisma.intento.findMany({
-        where: { usuarioId: user?.id },
+        where: { usuarioId: user.id },
         orderBy: { creadoEn: "desc" },
         take: 5,
         include: { cuestionario: true },

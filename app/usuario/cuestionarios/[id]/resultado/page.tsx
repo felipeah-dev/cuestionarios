@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ export default async function ResultadoCuestionarioPage({ params }: Props) {
   const { id } = await params;
   const user = await getCurrentUser();
 
-  if (!user) notFound();
+  if (!user) redirect("/login");
 
   const intento = await prisma.intento.findFirst({
     where: {
@@ -37,6 +37,7 @@ export default async function ResultadoCuestionarioPage({ params }: Props) {
   });
 
   if (!intento) notFound();
+  if (intento.estado === "EN_PROGRESO") redirect(`/usuario/cuestionarios/${id}`);
 
   const estaCalificado = intento.estado === "CALIFICADO";
   const estaEnviado = intento.estado === "ENVIADO";
@@ -148,7 +149,9 @@ export default async function ResultadoCuestionarioPage({ params }: Props) {
                         <Clock className="h-5 w-5 text-warning" />
                       )}
                       <Badge variant="outline" className="text-xs">
-                        {respuesta.puntajeObtenido ?? 0} / {pregunta.puntos} pts
+                        {respuesta.puntajeObtenido !== null
+                          ? `${respuesta.puntajeObtenido} / ${pregunta.puntos} pts`
+                          : "Pendiente"}
                       </Badge>
                     </div>
                   </div>
