@@ -3,6 +3,7 @@
 import React, { useActionState } from "react";
 import { loginAction } from "./_actions";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import {
   BookOpen,
@@ -149,19 +150,16 @@ export default function LoginPage() {
               <label htmlFor="password" className="text-sm font-semibold text-foreground">
                 Contraseña
               </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  disabled={isPending}
-                  className="pl-9 h-11"
-                  placeholder="••••••••"
-                />
-              </div>
+              <PasswordInput
+                id="password"
+                name="password"
+                leftIcon={<Lock className="h-4 w-4" />}
+                autoComplete="current-password"
+                required
+                disabled={isPending}
+                className="h-11"
+                placeholder="••••••••"
+              />
             </div>
 
             <Button
