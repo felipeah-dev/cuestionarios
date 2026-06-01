@@ -41,14 +41,14 @@ export async function saveAnswerAction(
       },
     },
     update: {
-      opcionId: data.opcionId || null,
-      respuestaAbierta: data.respuestaAbierta || null,
+      opcionId: data.opcionId ?? null,
+      respuestaAbierta: data.respuestaAbierta ?? null,
     },
     create: {
       intentoId,
       preguntaId,
-      opcionId: data.opcionId || null,
-      respuestaAbierta: data.respuestaAbierta || null,
+      opcionId: data.opcionId ?? null,
+      respuestaAbierta: data.respuestaAbierta ?? null,
     },
   });
 
@@ -96,7 +96,9 @@ export async function submitQuizAction(intentoId: string) {
   let puntosObtenidos = 0;
   let puntosTotales = 0;
 
-  // Grade each answer
+  // Grade each answer — build all write operations first, then run in one transaction
+  const operaciones: Prisma.PrismaPromise<unknown>[] = [];
+
   for (const pregunta of preguntas) {
     puntosTotales += pregunta.puntos;
     const respuesta = respuestas.find((r) => r.preguntaId === pregunta.id);
@@ -109,46 +111,35 @@ export async function submitQuizAction(intentoId: string) {
       const puntaje = esCorrecta ? pregunta.puntos : 0;
       puntosObtenidos += puntaje;
 
-      // Update the answer score in the DB.
-      // If the response wasn't saved in the draft (unanswered), we create a blank response with 0 points.
       if (respuesta) {
-        await prisma.respuesta.update({
-          where: { id: respuesta.id },
-          data: { puntajeObtenido: puntaje },
-        });
+        operaciones.push(
+          prisma.respuesta.update({ where: { id: respuesta.id }, data: { puntajeObtenido: puntaje } })
+        );
       } else {
-        await prisma.respuesta.create({
-          data: {
-            intentoId,
-            preguntaId: pregunta.id,
-            opcionId: null,
-            respuestaAbierta: null,
-            puntajeObtenido: puntaje,
-          },
-        });
+        operaciones.push(
+          prisma.respuesta.create({
+            data: { intentoId, preguntaId: pregunta.id, opcionId: null, respuestaAbierta: null, puntajeObtenido: puntaje },
+          })
+        );
       }
     } else if (pregunta.tipo === "ABIERTA") {
       contienePreguntasAbiertas = true;
 
-      // Open answers are left with puntajeObtenido: null until graded by admin
       if (respuesta) {
-        await prisma.respuesta.update({
-          where: { id: respuesta.id },
-          data: { puntajeObtenido: null },
-        });
+        operaciones.push(
+          prisma.respuesta.update({ where: { id: respuesta.id }, data: { puntajeObtenido: null } })
+        );
       } else {
-        await prisma.respuesta.create({
-          data: {
-            intentoId,
-            preguntaId: pregunta.id,
-            opcionId: null,
-            respuestaAbierta: null,
-            puntajeObtenido: null,
-          },
-        });
+        operaciones.push(
+          prisma.respuesta.create({
+            data: { intentoId, preguntaId: pregunta.id, opcionId: null, respuestaAbierta: null, puntajeObtenido: null },
+          })
+        );
       }
     }
   }
+
+  if (operaciones.length > 0) await prisma.$transaction(operaciones);
 
   const enviadoEn = new Date();
   let estadoFinal: "ENVIADO" | "CALIFICADO" = "ENVIADO";

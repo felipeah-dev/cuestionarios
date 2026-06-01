@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useRef } from "react";
+import { isRedirectError } from "next/dist/client/components/redirect";
 import { saveAnswerAction, submitQuizAction } from "../../_actions";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,15 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isSubmitting, startSubmitTransition] = useTransition();
 
+  // Tracks the last successfully saved text per question to avoid redundant saves on blur
+  const lastSavedRef = useRef<Record<string, string>>(
+    Object.fromEntries(
+      intento.respuestas
+        .filter((r) => r.respuestaAbierta !== null)
+        .map((r) => [r.preguntaId, r.respuestaAbierta!])
+    )
+  );
+
   const preguntas = cuestionario.preguntas;
   const preguntaActual = preguntas[currentQuestionIndex];
 
@@ -113,6 +123,10 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
         opcionId: data.opcionId,
         respuestaAbierta: data.respuestaAbierta,
       });
+      // Update ref so the next blur comparison uses the freshly saved value
+      if (data.respuestaAbierta !== undefined) {
+        lastSavedRef.current[preguntaId] = data.respuestaAbierta ?? "";
+      }
     } catch (error) {
       console.error("Error al autoguardar respuesta:", error);
     } finally {
@@ -121,30 +135,18 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
   };
 
   const handleTextareaBlur = (preguntaId: string, textValue: string) => {
-    const valorOriginal = responsesFromDbMap()[preguntaId]?.respuestaAbierta || "";
-    if (textValue !== valorOriginal) {
+    if (textValue !== (lastSavedRef.current[preguntaId] ?? "")) {
       handleSaveAnswer(preguntaId, { respuestaAbierta: textValue });
     }
-  };
-
-  // Helper to match with the db answers
-  const responsesFromDbMap = () => {
-    const mapa: Record<string, { opcionId?: string; respuestaAbierta?: string }> = {};
-    intento.respuestas.forEach((r) => {
-      mapa[r.preguntaId] = {
-        opcionId: r.opcionId || undefined,
-        respuestaAbierta: r.respuestaAbierta || undefined,
-      };
-    });
-    return mapa;
   };
 
   const handleFinalSubmit = () => {
     startSubmitTransition(async () => {
       try {
         await submitQuizAction(intento.id);
-      } catch (error) {
-        console.error("Error al enviar el cuestionario:", error);
+      } catch (e) {
+        if (isRedirectError(e)) throw e;
+        console.error("Error al enviar el cuestionario:", e);
       }
     });
   };
