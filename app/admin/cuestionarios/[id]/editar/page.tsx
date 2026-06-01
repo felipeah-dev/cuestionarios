@@ -3,7 +3,8 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { CuestionarioForm } from "../../_components/CuestionarioForm";
 import { getCuestionario, editarCuestionario } from "../../_actions";
-import type { CuestionarioFormValues, CuestionarioConPreguntas } from "../../_actions";
+import type { CuestionarioFormValues } from "@/lib/schemas/cuestionario";
+import type { CuestionarioConPreguntas } from "../../_actions";
 
 type Pregunta = CuestionarioConPreguntas["preguntas"][number];
 type Opcion = Pregunta["opciones"][number];

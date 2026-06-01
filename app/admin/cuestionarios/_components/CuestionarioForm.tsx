@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { PreguntaField } from "./PreguntaField";
 import { Plus, Loader2 } from "lucide-react";
 import { CuestionarioInput as schema } from "@/lib/schemas/cuestionario";
-import type { CuestionarioFormValues } from "../_actions";
+import type { CuestionarioFormValues } from "@/lib/schemas/cuestionario";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

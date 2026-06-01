@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Trash2, Plus } from "lucide-react";
-import type { CuestionarioFormValues } from "../_actions";
+import type { CuestionarioFormValues } from "@/lib/schemas/cuestionario";
 
 interface Props {
   index: number;

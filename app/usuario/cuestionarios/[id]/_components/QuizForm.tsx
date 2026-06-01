@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useTransition, useRef } from "react";
-import { isRedirectError } from "next/dist/client/components/redirect";
 import { saveAnswerAction, submitQuizAction } from "../../_actions";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -145,7 +144,6 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
       try {
         await submitQuizAction(intento.id);
       } catch (e) {
-        if (isRedirectError(e)) throw e;
         console.error("Error al enviar el cuestionario:", e);
       }
     });

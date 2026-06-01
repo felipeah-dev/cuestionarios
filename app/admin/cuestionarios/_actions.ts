@@ -4,9 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { CuestionarioInput, type CuestionarioFormValues } from "@/lib/schemas/cuestionario";
-
-export type { CuestionarioFormValues };
+import { CuestionarioInput } from "@/lib/schemas/cuestionario";
+import type { CuestionarioFormValues } from "@/lib/schemas/cuestionario";
 
 // Tipos exportados para que los page components tengan inferencia correcta
 export type CuestionarioListItem = {
