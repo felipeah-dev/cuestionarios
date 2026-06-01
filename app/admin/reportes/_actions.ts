@@ -1,5 +1,6 @@
 "use server";
 
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export type ReporteCuestionario = {
@@ -11,37 +12,36 @@ export type ReporteCuestionario = {
 };
 
 export async function getReportsDataAction(): Promise<ReporteCuestionario[]> {
-  const intentos = await prisma.intento.findMany({
-    where: { estado: "CALIFICADO" },
-    select: {
-      cuestionarioId: true,
-      calificacion: true,
-      cuestionario: {
-        select: { titulo: true },
-      },
+  const user = await getCurrentUser();
+  if (!user || user.rol !== "ADMIN") throw new Error("No autorizado");
+
+  const grupos = await prisma.intento.groupBy({
+    by: ["cuestionarioId"],
+    where: {
+      estado: "CALIFICADO",
+      calificacion: { not: null },
+      cuestionario: { adminId: user.id },
     },
+    _max: { calificacion: true },
+    _min: { calificacion: true },
+    _count: { id: true },
   });
 
-  const grouped = new Map<string, { titulo: string; calificaciones: number[] }>();
+  if (grupos.length === 0) return [];
 
-  for (const intento of intentos) {
-    if (intento.calificacion === null) continue;
+  // Fetch titles in a single query — groupBy doesn't support include
+  const cuestionarios = await prisma.cuestionario.findMany({
+    where: { id: { in: grupos.map((g) => g.cuestionarioId) } },
+    select: { id: true, titulo: true },
+  });
 
-    if (!grouped.has(intento.cuestionarioId)) {
-      grouped.set(intento.cuestionarioId, {
-        titulo: intento.cuestionario.titulo,
-        calificaciones: [],
-      });
-    }
+  const titulos = new Map(cuestionarios.map((c) => [c.id, c.titulo]));
 
-    grouped.get(intento.cuestionarioId)!.calificaciones.push(intento.calificacion);
-  }
-
-  return Array.from(grouped.entries()).map(([cuestionarioId, data]) => ({
-    cuestionarioId,
-    titulo: data.titulo,
-    maxima: Math.max(...data.calificaciones),
-    minima: Math.min(...data.calificaciones),
-    totalIntentos: data.calificaciones.length,
+  return grupos.map((grupo) => ({
+    cuestionarioId: grupo.cuestionarioId,
+    titulo: titulos.get(grupo.cuestionarioId) ?? "Sin título",
+    maxima: grupo._max.calificacion ?? 0,
+    minima: grupo._min.calificacion ?? 0,
+    totalIntentos: grupo._count.id,
   }));
 }
