@@ -2,47 +2,14 @@
 
 import { useForm, useFieldArray, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PreguntaField } from "./PreguntaField";
 import { Plus, Loader2 } from "lucide-react";
+import { CuestionarioInput as schema } from "@/lib/schemas/cuestionario";
 import type { CuestionarioFormValues } from "../_actions";
-
-// ─── Schema (espeja el de _actions para la validación cliente) ────────────────
-
-const OpcionInput = z.object({
-  texto: z.string(),
-  esCorrecta: z.boolean(),
-});
-
-const PreguntaInput = z
-  .object({
-    texto: z.string().min(1, "Requerido"),
-    tipo: z.enum(["OPCION_MULTIPLE", "ABIERTA"]),
-    puntos: z.number().positive("Mayor a 0"),
-    orden: z.number().int(),
-    opciones: z.array(OpcionInput).optional(),
-  })
-  .superRefine((val, ctx) => {
-    if (val.tipo === "OPCION_MULTIPLE") {
-      const lista = val.opciones ?? [];
-      if (lista.length < 2)
-        ctx.addIssue({ code: "custom", message: "Al menos 2 opciones", path: ["opciones"] });
-      if (lista.some((o) => !o.texto.trim()))
-        ctx.addIssue({ code: "custom", message: "Todas las opciones deben tener texto", path: ["opciones"] });
-      if (lista.filter((o) => o.esCorrecta).length !== 1)
-        ctx.addIssue({ code: "custom", message: "Marca exactamente una opción correcta", path: ["opciones"] });
-    }
-  });
-
-const schema = z.object({
-  titulo: z.string().min(1, "El título es requerido"),
-  descripcion: z.string().optional(),
-  preguntas: z.array(PreguntaInput).min(1, "Agrega al menos una pregunta"),
-});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

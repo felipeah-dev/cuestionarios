@@ -3,8 +3,10 @@
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { Prisma } from "@prisma/client";
+import { CuestionarioInput, type CuestionarioFormValues } from "@/lib/schemas/cuestionario";
+
+export type { CuestionarioFormValues };
 
 // Tipos exportados para que los page components tengan inferencia correcta
 export type CuestionarioListItem = {
@@ -37,45 +39,6 @@ export type CuestionarioConPreguntas = {
     }>;
   }>;
 };
-
-// ─── Schema ───────────────────────────────────────────────────────────────────
-
-const OpcionInput = z.object({
-  texto: z.string(),
-  esCorrecta: z.boolean(),
-});
-
-const PreguntaInput = z
-  .object({
-    texto: z.string().min(1, "El texto de la pregunta es requerido"),
-    tipo: z.enum(["OPCION_MULTIPLE", "ABIERTA"]),
-    puntos: z.number().positive("Los puntos deben ser mayores a 0"),
-    orden: z.number().int(),
-    opciones: z.array(OpcionInput).optional(),
-  })
-  .superRefine((val, ctx) => {
-    if (val.tipo === "OPCION_MULTIPLE") {
-      const lista = val.opciones ?? [];
-      if (lista.length < 2) {
-        ctx.addIssue({ code: "custom", message: "Debe tener al menos 2 opciones", path: ["opciones"] });
-      }
-      if (lista.some((o) => !o.texto.trim())) {
-        ctx.addIssue({ code: "custom", message: "Todas las opciones deben tener texto", path: ["opciones"] });
-      }
-      const correctas = lista.filter((o) => o.esCorrecta).length;
-      if (correctas !== 1) {
-        ctx.addIssue({ code: "custom", message: "Debe haber exactamente una opción correcta", path: ["opciones"] });
-      }
-    }
-  });
-
-const CuestionarioInput = z.object({
-  titulo: z.string().min(1, "El título es requerido"),
-  descripcion: z.string().optional(),
-  preguntas: z.array(PreguntaInput).min(1, "Debe tener al menos una pregunta"),
-});
-
-export type CuestionarioFormValues = z.infer<typeof CuestionarioInput>;
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 
@@ -155,6 +118,13 @@ export async function editarCuestionario(id: string, raw: CuestionarioFormValues
     include: { preguntas: { select: { id: true } } },
   });
   if (!existing) throw new Error("Cuestionario no encontrado o sin permisos");
+
+  const intentoCount = await prisma.intento.count({ where: { cuestionarioId: id } });
+  if (intentoCount > 0) {
+    throw new Error(
+      "Este cuestionario ya tiene respuestas de alumnos registradas y no puede modificarse. Si necesitas hacer cambios, crea un nuevo cuestionario."
+    );
+  }
 
   const preguntaIds: string[] = existing.preguntas.map((p: { id: string }) => p.id);
 

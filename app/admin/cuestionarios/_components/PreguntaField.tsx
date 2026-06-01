@@ -4,7 +4,7 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Trash2, Plus, GripVertical } from "lucide-react";
+import { Trash2, Plus } from "lucide-react";
 import type { CuestionarioFormValues } from "../_actions";
 
 interface Props {
@@ -41,7 +41,6 @@ export function PreguntaField({ index, onRemove }: Props) {
   return (
     <Card className="border border-slate-200 dark:border-slate-700 shadow-sm">
       <CardHeader className="pb-3 flex flex-row items-start gap-3">
-        <GripVertical className="h-5 w-5 text-muted-foreground mt-1 shrink-0" />
         <span className="text-primary font-bold text-lg shrink-0">{index + 1}.</span>
         <div className="flex-1 space-y-3">
           <input
@@ -64,7 +63,7 @@ export function PreguntaField({ index, onRemove }: Props) {
         </Button>
       </CardHeader>
 
-      <CardContent className="space-y-4 pl-14">
+      <CardContent className="space-y-4 pl-8">
         {/* Tipo, puntos */}
         <div className="flex flex-wrap gap-4">
           <div className="space-y-1">
