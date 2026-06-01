@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, startTransition } from "react";
+import React, { useState, startTransition } from "react";
 import { createPortal } from "react-dom";
 import { logoutAction } from "@/app/login/_actions";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,6 @@ interface Props {
 
 export default function LogoutButton({ className }: Props) {
   const [isOpen, setIsOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
 
   const handleLogout = () => {
     startTransition(async () => {
@@ -83,7 +77,7 @@ export default function LogoutButton({ className }: Props) {
         <span className="hidden sm:inline text-xs font-medium">Salir</span>
       </Button>
 
-      {isOpen && mounted && createPortal(modalContent, document.body)}
+      {isOpen && createPortal(modalContent, document.body)}
     </>
   );
 }
