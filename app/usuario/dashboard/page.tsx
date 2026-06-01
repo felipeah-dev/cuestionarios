@@ -14,7 +14,18 @@ export default async function UsuarioDashboardPage() {
 
   const [totalCuestionarios, totalIntentos, intentosRecientes] =
     await Promise.all([
-      prisma.cuestionario.count(),
+      prisma.cuestionario.count({
+        where: {
+          NOT: {
+            intentos: {
+              some: {
+                usuarioId: user.id,
+                estado: { in: ["ENVIADO", "CALIFICADO"] },
+              },
+            },
+          },
+        },
+      }),
       prisma.intento.count({
         where: { usuarioId: user.id, estado: { in: ["ENVIADO", "CALIFICADO"] } },
       }),

@@ -14,7 +14,7 @@ export type CuestionarioListItem = {
   descripcion: string | null;
   adminId: string;
   creadoEn: Date;
-  _count: { preguntas: number };
+  _count: { preguntas: number; intentos: number };
 };
 
 export type CuestionarioConPreguntas = {
@@ -72,7 +72,7 @@ export async function listarCuestionarios(): Promise<CuestionarioListItem[]> {
   const user = await requireAdmin();
   return prisma.cuestionario.findMany({
     where: { adminId: user.id },
-    include: { _count: { select: { preguntas: true } } },
+    include: { _count: { select: { preguntas: true, intentos: true } } },
     orderBy: { creadoEn: "desc" },
   });
 }

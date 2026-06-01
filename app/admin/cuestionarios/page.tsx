@@ -12,7 +12,7 @@ import {
 import { AccionesRow } from "./_components/AccionesRow";
 import { listarCuestionarios } from "./_actions";
 import type { CuestionarioListItem } from "./_actions";
-import { Plus, BookOpen } from "lucide-react";
+import { Plus, BookOpen, Users } from "lucide-react";
 
 export default async function AdminCuestionariosPage() {
   const cuestionarios = await listarCuestionarios();
@@ -62,6 +62,7 @@ export default async function AdminCuestionariosPage() {
                 <TableHead className="font-semibold">Título</TableHead>
                 <TableHead className="font-semibold">Descripción</TableHead>
                 <TableHead className="font-semibold text-center">Preguntas</TableHead>
+                <TableHead className="font-semibold text-center">Intentos</TableHead>
                 <TableHead className="font-semibold">Creado</TableHead>
                 <TableHead className="text-right font-semibold">Acciones</TableHead>
               </TableRow>
@@ -75,6 +76,20 @@ export default async function AdminCuestionariosPage() {
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline">{c._count.preguntas}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Link
+                      href={`/admin/cuestionarios/${c.id}/intentos`}
+                      className="inline-flex items-center gap-1.5"
+                    >
+                      <Badge
+                        variant={c._count.intentos > 0 ? "default" : "outline"}
+                        className="gap-1"
+                      >
+                        <Users className="h-3 w-3" />
+                        {c._count.intentos}
+                      </Badge>
+                    </Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {new Date(c.creadoEn).toLocaleDateString("es-MX", {

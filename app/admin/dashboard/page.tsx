@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,8 +11,32 @@ import {
   PlusCircle,
   ArrowRight,
 } from "lucide-react";
+import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-export default function AdminDashboardPage() {
+export default async function AdminDashboardPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const [totalCuestionarios, calificacionesPendientes, intentosCompletados] =
+    await Promise.all([
+      prisma.cuestionario.count({
+        where: { adminId: user.id },
+      }),
+      prisma.intento.count({
+        where: {
+          estado: "ENVIADO",
+          cuestionario: { adminId: user.id },
+        },
+      }),
+      prisma.intento.count({
+        where: {
+          estado: { in: ["ENVIADO", "CALIFICADO"] },
+          cuestionario: { adminId: user.id },
+        },
+      }),
+    ]);
+
   return (
     <div className="space-y-8">
       {/* Hero banner */}
@@ -23,7 +48,7 @@ export default function AdminDashboardPage() {
               Panel Administrativo
             </Badge>
             <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-              Bienvenido, Administrador
+              Bienvenido, {user.name}
             </h1>
             <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
               Gestiona evaluaciones, revisa el rendimiento de los alumnos y califica
@@ -53,7 +78,9 @@ export default function AdminDashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-1">
-            <div className="text-3xl font-extrabold tracking-tight text-foreground">0</div>
+            <div className="text-3xl font-extrabold tracking-tight text-foreground">
+              {totalCuestionarios}
+            </div>
             <p className="text-xs text-muted-foreground">Activos en la plataforma</p>
           </CardContent>
         </Card>
@@ -68,7 +95,9 @@ export default function AdminDashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-1">
-            <div className="text-3xl font-extrabold tracking-tight text-foreground">0</div>
+            <div className="text-3xl font-extrabold tracking-tight text-foreground">
+              {calificacionesPendientes}
+            </div>
             <p className="text-xs text-muted-foreground">Respuestas por evaluar</p>
           </CardContent>
         </Card>
@@ -83,7 +112,9 @@ export default function AdminDashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-1">
-            <div className="text-3xl font-extrabold tracking-tight text-foreground">0</div>
+            <div className="text-3xl font-extrabold tracking-tight text-foreground">
+              {intentosCompletados}
+            </div>
             <p className="text-xs text-muted-foreground">Exámenes entregados</p>
           </CardContent>
         </Card>
