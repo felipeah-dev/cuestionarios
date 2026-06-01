@@ -4,7 +4,10 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 import { NavLinks } from "@/components/NavLinks";
-import { BookOpen } from "lucide-react";
+import { BookOpen, AlertTriangle, LogOut } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { signOut } from "@/auth";
+import { Button } from "@/components/ui/button";
 
 export default async function UsuarioLayout({
   children,
@@ -14,6 +17,47 @@ export default async function UsuarioLayout({
   const session = await getSession();
 
   if (!session?.user) redirect("/login");
+
+  // Verify the user exists in the database (safeguard against stale cookies post-reseeding)
+  const dbUser = await prisma.usuario.findUnique({
+    where: { id: session.user.id },
+  });
+  
+  if (!dbUser) {
+    // Render a premium recovery screen. The form action uses a Server Action,
+    // which is fully allowed by Next.js to modify cookies and log the user out cleanly.
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4 text-foreground font-sans">
+        <div className="max-w-md w-full bg-card border border-border/80 rounded-2xl shadow-2xl p-6 space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+          <div className="mx-auto h-12 w-12 bg-destructive/10 border border-destructive/20 rounded-xl flex items-center justify-center text-destructive">
+            <AlertTriangle className="h-6 w-6 animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold tracking-tight">Sesión Invalida o Caducada</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              La base de datos fue restablecida recientemente y tu sesión actual ya no es válida en el servidor.
+            </p>
+          </div>
+          <form
+            action={async () => {
+              "use server";
+              await signOut({ redirectTo: "/login" });
+            }}
+          >
+            <Button
+              type="submit"
+              variant="destructive"
+              className="w-full rounded-xl cursor-pointer h-10 font-bold shadow-md shadow-destructive/10"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Cerrar Sesión e Ingresar
+            </Button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (session.user.rol !== "USUARIO") redirect("/admin/dashboard");
 
   return (

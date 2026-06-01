@@ -4,10 +4,32 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BookOpen, CheckCircle, ArrowRight } from "lucide-react";
+import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 
-export default function UsuarioDashboardPage() {
+export default async function UsuarioDashboardPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  // Get total questionnaires in DB
+  const totalCuestionarios = await prisma.cuestionario.count();
+
+  // Get completed attempts (submitted or graded) for this user
+  const intentosRealizados = await prisma.intento.count({
+    where: {
+      usuarioId: user.id,
+      estado: {
+        in: ["ENVIADO", "CALIFICADO"],
+      },
+    },
+  });
+
+  // Available questionnaires = total - completed
+  const disponiblesParaContestar = Math.max(0, totalCuestionarios - intentosRealizados);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-in">
       {/* Hero banner */}
       <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-primary/5 p-6 md:p-8">
         <div className="absolute -right-10 -top-10 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
@@ -16,7 +38,7 @@ export default function UsuarioDashboardPage() {
             Portal del Estudiante
           </Badge>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            Bienvenido de nuevo
+            Bienvenido, {user.name}
           </h1>
           <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
             Revisa las evaluaciones disponibles, respóndelas y consulta tus
@@ -37,7 +59,9 @@ export default function UsuarioDashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-1">
-            <div className="text-3xl font-extrabold tracking-tight text-foreground">0</div>
+            <div className="text-3xl font-extrabold tracking-tight text-foreground">
+              {disponiblesParaContestar}
+            </div>
             <p className="text-xs text-muted-foreground">Disponibles para contestar</p>
           </CardContent>
         </Card>
@@ -52,7 +76,9 @@ export default function UsuarioDashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-1">
-            <div className="text-3xl font-extrabold tracking-tight text-foreground">0</div>
+            <div className="text-3xl font-extrabold tracking-tight text-foreground">
+              {intentosRealizados}
+            </div>
             <p className="text-xs text-muted-foreground">Exámenes enviados</p>
           </CardContent>
         </Card>
@@ -74,6 +100,7 @@ export default function UsuarioDashboardPage() {
             variant="ghost"
             size="icon"
             render={<Link href="/usuario/cuestionarios" />}
+            nativeButton={false}
             className="shrink-0 group-hover:text-primary group-hover:bg-primary/10 transition-colors"
           >
             <ArrowRight className="h-4 w-4" />
