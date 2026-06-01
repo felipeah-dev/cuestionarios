@@ -79,6 +79,7 @@ export default async function CalificarCuestionarioPage({ params }: Props) {
         select: {
           titulo: true,
           descripcion: true,
+          adminId: true,
         },
       },
       usuario: {
@@ -101,6 +102,7 @@ export default async function CalificarCuestionarioPage({ params }: Props) {
   });
 
   if (!intento) notFound();
+  if (intento.cuestionario.adminId !== user.id) redirect("/admin/dashboard");
 
   const respuestas = [...intento.respuestas].sort(
     (a, b) => a.pregunta.orden - b.pregunta.orden

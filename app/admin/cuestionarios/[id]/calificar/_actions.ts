@@ -38,6 +38,7 @@ export async function gradeOpenQuestionAction(
             select: {
               id: true,
               estado: true,
+              cuestionarioId: true,
             },
           },
           pregunta: {
@@ -51,6 +52,13 @@ export async function gradeOpenQuestionAction(
 
       if (!respuesta) {
         return { ok: false, error: "No se encontro la respuesta a calificar." };
+      }
+
+      const cuestionario = await tx.cuestionario.findFirst({
+        where: { id: respuesta.intento.cuestionarioId, adminId: user.id },
+      });
+      if (!cuestionario) {
+        return { ok: false, error: "Sin permisos para calificar este intento." };
       }
 
       if (respuesta.pregunta.tipo !== TipoPregunta.ABIERTA) {

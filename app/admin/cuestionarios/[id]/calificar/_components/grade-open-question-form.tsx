@@ -43,22 +43,20 @@ export function GradeOpenQuestionForm({
       return;
     }
 
-    startTransition(() => {
-      void (async () => {
-        const result = await gradeOpenQuestionAction(respuestaId, numericScore);
+    startTransition(async () => {
+      const result = await gradeOpenQuestionAction(respuestaId, numericScore);
 
-        if (!result.ok) {
-          setError(result.error);
-          return;
-        }
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
 
-        setMessage(
-          result.intentoCalificado
-            ? "Puntaje guardado. Intento calificado."
-            : "Puntaje guardado."
-        );
-        router.refresh();
-      })();
+      setMessage(
+        result.intentoCalificado
+          ? "Puntaje guardado. Intento calificado."
+          : "Puntaje guardado."
+      );
+      router.refresh();
     });
   }
 
