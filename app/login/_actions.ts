@@ -7,7 +7,7 @@ import { AuthError } from "next-auth";
  * Server Action to handle user login.
  * Compatible with React 19's useActionState.
  */
-export async function loginAction(prevState: any, formData: FormData) {
+export async function loginAction(_prevState: unknown, formData: FormData) {
   const email = formData.get("email");
   const password = formData.get("password");
 

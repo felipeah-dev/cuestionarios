@@ -47,7 +47,7 @@ export default async function UsuarioDashboardPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-in">
       {/* Hero banner */}
       <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-primary/5 p-6 md:p-8">
         <div className="absolute -right-10 -top-10 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
@@ -56,7 +56,7 @@ export default async function UsuarioDashboardPage() {
             Portal del Estudiante
           </Badge>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            Bienvenido de nuevo
+            Bienvenido, {user.name}
           </h1>
           <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
             Revisa las evaluaciones disponibles, respóndelas y consulta tus
@@ -111,44 +111,44 @@ export default async function UsuarioDashboardPage() {
             Intentos Recientes
           </h2>
           <div className="space-y-3">
-            {intentosRecientes.map((intento: typeof intentosRecientes[number]) => (              <Card
-                key={intento.id}
-                className="border border-border/60 bg-card shadow-sm hover:shadow-md hover:border-border transition-all duration-200"
-              >
-                <CardContent className="p-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                      <BookOpen className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm text-foreground truncate">
-                        {intento.cuestionario.titulo}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {new Date(intento.creadoEn).toLocaleDateString("es-MX", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </p>
-                    </div>
+            {intentosRecientes.map((intento: typeof intentosRecientes[number]) => (<Card
+              key={intento.id}
+              className="border border-border/60 bg-card shadow-sm hover:shadow-md hover:border-border transition-all duration-200"
+            >
+              <CardContent className="p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <BookOpen className="h-4 w-4" />
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {estadoBadge(intento.estado)}
-                    {intento.estado === "CALIFICADO" && (
-                      <span className="text-sm font-bold text-foreground">
-                        {intento.calificacion?.toFixed(1)}
-                        <span className="text-xs text-muted-foreground font-normal">
-                          /100
-                        </span>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm text-foreground truncate">
+                      {intento.cuestionario.titulo}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {new Date(intento.creadoEn).toLocaleDateString("es-MX", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {estadoBadge(intento.estado)}
+                  {intento.estado === "CALIFICADO" && (
+                    <span className="text-sm font-bold text-foreground">
+                      {intento.calificacion?.toFixed(1)}
+                      <span className="text-xs text-muted-foreground font-normal">
+                        /100
                       </span>
-                    )}
-<Link href={`/usuario/cuestionarios/${intento.cuestionarioId}/resultado`} className="p-2 hover:bg-muted rounded-md transition-colors">
-  <ArrowRight className="h-4 w-4" />
-</Link>
-                  </div>
-                </CardContent>
-              </Card>
+                    </span>
+                  )}
+                  <Link href={`/usuario/cuestionarios/${intento.cuestionarioId}/resultado`} className="p-2 hover:bg-muted rounded-md transition-colors">
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
             ))}
           </div>
         </div>
@@ -168,12 +168,12 @@ export default async function UsuarioDashboardPage() {
               Ver todas las evaluaciones disponibles para ti
             </p>
           </div>
-<Link
-  href="/usuario/cuestionarios"
-  className="shrink-0 p-2 hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
->
-  <ArrowRight className="h-4 w-4" />
-</Link>
+          <Link
+            href="/usuario/cuestionarios"
+            className="shrink-0 p-2 hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
+          >
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </CardContent>
       </Card>
     </div>
