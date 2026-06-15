@@ -2,11 +2,11 @@ import React from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { BookOpen, CheckCircle, ArrowRight, Clock, Trophy } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { clampPercentage } from "@/lib/quiz-rules";
 
 export default async function UsuarioDashboardPage() {
   const user = await getCurrentUser();
@@ -148,7 +148,7 @@ export default async function UsuarioDashboardPage() {
                   {estadoBadge(intento.estado)}
                   {intento.estado === "CALIFICADO" && (
                     <span className="text-sm font-bold text-foreground">
-                      {intento.calificacion?.toFixed(1)}
+                      {clampPercentage(intento.calificacion ?? 0).toFixed(1)}
                       <span className="text-xs text-muted-foreground font-normal">
                         /100
                       </span>

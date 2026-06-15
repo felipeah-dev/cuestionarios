@@ -4,6 +4,7 @@ import { EstadoIntento, TipoPregunta } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { calculateFinalPercentage } from "@/lib/quiz-rules";
 
 type GradeOpenQuestionResult =
   | { ok: true; intentoCalificado: boolean }
@@ -109,8 +110,10 @@ export async function gradeOpenQuestionAction(
           (total, item) => total + item.pregunta.puntos,
           0
         );
-        const calificacion =
-          puntosMaximos > 0 ? (puntosObtenidos / puntosMaximos) * 100 : 0;
+        const calificacion = calculateFinalPercentage(
+          puntosObtenidos,
+          puntosMaximos
+        );
 
         await tx.intento.update({
           where: { id: respuesta.intento.id },

@@ -6,6 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { FileText, Award, Calendar, ChevronRight, Clock } from "lucide-react";
+import {
+  clampPercentage,
+  formatDuration,
+  getQuizEstimatedMinutes,
+} from "@/lib/quiz-rules";
 
 export const metadata = {
   title: "Cuestionarios Disponibles — Portal Académico",
@@ -25,6 +30,11 @@ export default async function UsuarioCuestionariosPage() {
       intentos: {
         where: { usuarioId: user.id },
         orderBy: { creadoEn: "desc" },
+        include: {
+          _count: {
+            select: { respuestas: true },
+          },
+        },
       },
     },
     orderBy: { creadoEn: "desc" },
@@ -53,8 +63,13 @@ export default async function UsuarioCuestionariosPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cuestionarios.map((c) => {
             const ultimoIntento = c.intentos[0];
+            const intentoRealmenteIniciado =
+              !!ultimoIntento &&
+              (ultimoIntento.estado !== "EN_PROGRESO" ||
+                ultimoIntento._count.respuestas > 0);
             const totalPreguntas = c.preguntas.length;
             const puntosTotales = c.preguntas.reduce((acc, p) => acc + p.puntos, 0);
+            const duracionEstimada = getQuizEstimatedMinutes(c.preguntas);
 
             let statusBadge = <Badge variant="secondary" className="font-semibold text-xs py-0.5 px-2 bg-secondary/80">Sin Iniciar</Badge>;
             let actionButton = (
@@ -64,7 +79,7 @@ export default async function UsuarioCuestionariosPage() {
               </Button>
             );
 
-            if (ultimoIntento) {
+            if (ultimoIntento && intentoRealmenteIniciado) {
               if (ultimoIntento.estado === "EN_PROGRESO") {
                 statusBadge = (
                   <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border border-amber-500/20 font-semibold text-xs py-0.5 px-2">
@@ -90,7 +105,7 @@ export default async function UsuarioCuestionariosPage() {
                   </Button>
                 );
               } else if (ultimoIntento.estado === "CALIFICADO") {
-                const calificacion = ultimoIntento.calificacion ?? 0;
+                const calificacion = clampPercentage(ultimoIntento.calificacion ?? 0);
                 const califColor =
                   calificacion >= 70
                     ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
@@ -140,14 +155,20 @@ export default async function UsuarioCuestionariosPage() {
                 </CardHeader>
 
                 <CardContent className="space-y-5 flex-1 flex flex-col justify-between">
-                  <div className="grid grid-cols-2 gap-4 py-3 px-4 rounded-xl bg-secondary/40 border border-border/40 text-xs">
+                  <div className="grid grid-cols-3 gap-3 py-3 px-4 rounded-xl bg-secondary/40 border border-border/40 text-xs">
                     <div>
                       <span className="text-muted-foreground block mb-0.5">Preguntas</span>
                       <span className="font-bold text-sm text-foreground">{totalPreguntas} reactivos</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block mb-0.5">Valor Total</span>
-                      <span className="font-bold text-sm text-foreground">{puntosTotales} pts</span>
+                      <span className="text-muted-foreground block mb-0.5">Valor</span>
+                      <span className="font-bold text-sm text-foreground">{puntosTotales}%</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block mb-0.5">Duracion</span>
+                      <span className="font-bold text-sm text-foreground">
+                        {formatDuration(duracionEstimada)}
+                      </span>
                     </div>
                   </div>
 

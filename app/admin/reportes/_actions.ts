@@ -2,6 +2,7 @@
 
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { clampPercentage } from "@/lib/quiz-rules";
 
 export type ReporteCuestionario = {
   cuestionarioId: string;
@@ -40,8 +41,8 @@ export async function getReportsDataAction(): Promise<ReporteCuestionario[]> {
   return grupos.map((grupo) => ({
     cuestionarioId: grupo.cuestionarioId,
     titulo: titulos.get(grupo.cuestionarioId) ?? "Sin título",
-    maxima: grupo._max.calificacion ?? 0,
-    minima: grupo._min.calificacion ?? 0,
+    maxima: clampPercentage(grupo._max.calificacion ?? 0),
+    minima: clampPercentage(grupo._min.calificacion ?? 0),
     totalIntentos: grupo._count.id,
   }));
 }

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { ArrowLeft, ClipboardList, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { clampPercentage } from "@/lib/quiz-rules";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -109,7 +110,7 @@ export default async function IntentosCuestionarioPage({ params }: Props) {
                     </TableCell>
                     <TableCell className="text-center font-semibold">
                       {intento.calificacion !== null
-                        ? `${intento.calificacion.toFixed(1)} / 100`
+                        ? `${clampPercentage(intento.calificacion).toFixed(1)} / 100`
                         : <span className="text-muted-foreground text-sm">—</span>}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">

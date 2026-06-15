@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, AlertCircle, ArrowLeft, HelpCircle } from "lucide-react";
 import Link from "next/link";
+import { clampPercentage } from "@/lib/quiz-rules";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -54,7 +55,7 @@ export default async function ResultadoCuestionarioPage({ params }: Props) {
   const preguntas = cuestionario.preguntas;
 
   const esCalificado = intento.estado === "CALIFICADO";
-  const calificacion = intento.calificacion ?? 0;
+  const calificacion = clampPercentage(intento.calificacion ?? 0);
 
   // Visual status indicators
   let ringColor = "border-destructive text-destructive bg-destructive/5";

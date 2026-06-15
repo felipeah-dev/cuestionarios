@@ -22,6 +22,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
+import { clampPercentage } from "@/lib/quiz-rules";
 import { GradeOpenQuestionForm } from "./_components/grade-open-question-form";
 
 interface Props {
@@ -129,6 +130,8 @@ export default async function CalificarCuestionarioPage({ params }: Props) {
     puntosMaximos > 0 ? (puntosObtenidos / puntosMaximos) * 100 : 0;
   const calificacionVisible =
     intento.calificacion ?? (respuestasPendientes === 0 ? calificacionCalculada : null);
+  const calificacionMostrada =
+    calificacionVisible === null ? null : clampPercentage(calificacionVisible);
   const canGrade =
     intento.estado === EstadoIntento.ENVIADO ||
     intento.estado === EstadoIntento.CALIFICADO;
@@ -222,9 +225,9 @@ export default async function CalificarCuestionarioPage({ params }: Props) {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-extrabold tracking-tight text-foreground">
-              {calificacionVisible === null
+              {calificacionMostrada === null
                 ? "Pendiente"
-                : formatPercent(calificacionVisible)}
+                : formatPercent(calificacionMostrada)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Calificado: {formatDate(intento.calificadoEn)}

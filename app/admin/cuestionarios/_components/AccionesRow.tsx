@@ -73,7 +73,7 @@ export function AccionesRow({ id, titulo }: Props) {
             <DialogTitle>¿Eliminar cuestionario?</DialogTitle>
             <DialogDescription>
               Se eliminará{" "}
-              <span className="font-medium text-foreground">"{titulo}"</span>{" "}
+              <span className="font-medium text-foreground">&quot;{titulo}&quot;</span>{" "}
               junto con todas sus preguntas, opciones e intentos. Esta acción no
               se puede deshacer.
             </DialogDescription>

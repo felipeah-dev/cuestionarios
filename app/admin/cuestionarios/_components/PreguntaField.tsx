@@ -1,11 +1,15 @@
 "use client";
 
-import { useFieldArray, useFormContext } from "react-hook-form";
+import { useFieldArray, useFormContext, type FieldError } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Trash2, Plus } from "lucide-react";
 import type { CuestionarioFormValues } from "@/lib/schemas/cuestionario";
+
+type OpcionesError = FieldError & {
+  root?: FieldError;
+};
 
 interface Props {
   index: number;
@@ -81,15 +85,16 @@ export function PreguntaField({ index, onRemove }: Props) {
 
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Puntos
+              Ponderacion (%)
             </label>
             <Input
               type="number"
               step="0.5"
               min="0.5"
+              max="100"
               {...register(`preguntas.${index}.puntos`, { valueAsNumber: true })}
               className="w-24"
-              placeholder="1"
+              placeholder="10"
             />
             {preguntaErrors?.puntos && (
               <p className="text-xs text-destructive">{preguntaErrors.puntos.message}</p>
@@ -101,7 +106,7 @@ export function PreguntaField({ index, onRemove }: Props) {
         {tipo === "OPCION_MULTIPLE" && (
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Opciones — marca la correcta
+              Opciones: marca la correcta. Tiempo estimado: 1 minuto.
             </p>
 
             {fields.map((field, opIdx) => {
@@ -140,7 +145,7 @@ export function PreguntaField({ index, onRemove }: Props) {
 
             {/* Errores de opciones: texto vacío o sin correcta marcada */}
             {(() => {
-              const err = preguntaErrors?.opciones as any;
+              const err = preguntaErrors?.opciones as OpcionesError | undefined;
               const msg = err?.root?.message ?? err?.message;
               if (!msg) return null;
               return (
@@ -165,7 +170,8 @@ export function PreguntaField({ index, onRemove }: Props) {
 
         {tipo === "ABIERTA" && (
           <p className="text-xs text-muted-foreground italic">
-            Respuesta abierta — el admin la calificará manualmente.
+            Respuesta abierta: el admin la calificara manualmente. Tiempo estimado:
+            5 minutos.
           </p>
         )}
       </CardContent>

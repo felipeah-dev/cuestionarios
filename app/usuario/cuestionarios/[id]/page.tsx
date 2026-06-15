@@ -1,5 +1,10 @@
 import { getCurrentUser } from "@/lib/auth";
+import { finalizeQuizAttemptForUser } from "@/lib/quiz-finalization";
 import { prisma } from "@/lib/prisma";
+import {
+  getAttemptRemainingSeconds,
+  getQuizEstimatedMinutes,
+} from "@/lib/quiz-rules";
 import { redirect } from "next/navigation";
 import QuizForm from "./_components/QuizForm";
 
@@ -36,7 +41,7 @@ export default async function ResponderCuestionarioPage({ params }: Props) {
   }
 
   // Find the user's attempt for this questionnaire
-  let intento = await prisma.intento.findFirst({
+  const intento = await prisma.intento.findFirst({
     where: { cuestionarioId: id, usuarioId: user.id },
     orderBy: { creadoEn: "desc" },
     include: { respuestas: true },
@@ -47,16 +52,20 @@ export default async function ResponderCuestionarioPage({ params }: Props) {
     redirect(`/usuario/cuestionarios/${id}/resultado`);
   }
 
-  // If no attempt exists, create a new one in state EN_PROGRESO
-  if (!intento) {
-    intento = await prisma.intento.create({
-      data: {
-        cuestionarioId: id,
+  if (intento?.estado === "EN_PROGRESO") {
+    const remainingSeconds = getAttemptRemainingSeconds(
+      intento.creadoEn,
+      getQuizEstimatedMinutes(cuestionario.preguntas)
+    );
+
+    if (remainingSeconds <= 0) {
+      await finalizeQuizAttemptForUser({
+        intentoId: intento.id,
         usuarioId: user.id,
-        estado: "EN_PROGRESO",
-      },
-      include: { respuestas: true },
-    });
+      });
+
+      redirect(`/usuario/cuestionarios/${id}/resultado`);
+    }
   }
 
   return (
