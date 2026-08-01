@@ -42,6 +42,9 @@ next-env.d.ts
 
 /app/generated/prisma
 
+# Private local evidence/uploads
+/storage
+
 # AI assistant files
 .claude
 

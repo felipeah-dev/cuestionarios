@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, AlertCircle, ArrowLeft, HelpCircle } from "lucide-react";
 import Link from "next/link";
-import { clampPercentage } from "@/lib/quiz-rules";
+import { clampPercentage, isActiveAttemptStatus } from "@/lib/quiz-rules";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -47,15 +47,29 @@ export default async function ResultadoCuestionarioPage({ params }: Props) {
   });
 
   if (!intento) notFound();
-  if (intento.estado === "EN_PROGRESO") {
+  if (isActiveAttemptStatus(intento.estado)) {
     redirect(`/usuario/cuestionarios/${id}`);
+  }
+  if (intento.estado === "PAUSADO_REVISION_IA") {
+    redirect(`/usuario/cuestionarios/${id}/pausado`);
   }
 
   const { cuestionario, respuestas } = intento;
   const preguntas = cuestionario.preguntas;
 
   const esCalificado = intento.estado === "CALIFICADO";
+  const esCancelado = intento.estado === "CANCELADO_CONFIRMADO";
   const calificacion = clampPercentage(intento.calificacion ?? 0);
+  const statusDate = esCancelado ? intento.canceladoEn : intento.enviadoEn;
+  const statusDateLabel = esCancelado ? "Cancelado el" : "Enviado el";
+  const formattedStatusDate = statusDate
+    ? new Date(statusDate).toLocaleString("es-ES", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "Fecha no disponible";
 
   // Visual status indicators
   let ringColor = "border-destructive text-destructive bg-destructive/5";
@@ -90,28 +104,29 @@ export default async function ResultadoCuestionarioPage({ params }: Props) {
               {cuestionario.titulo}
             </h1>
             <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-              {esCalificado
-                ? feedbackMessage
-                : "Tus respuestas han sido enviadas. Al contener preguntas abiertas, la calificación final se actualizará una vez que el docente las evalúe manualmente."}
+              {esCancelado
+                ? "Este intento fue cancelado despues de una revision humana de proctoring."
+                : esCalificado
+                  ? feedbackMessage
+                  : "Tus respuestas han sido enviadas. Al contener preguntas abiertas, la calificación final se actualizará una vez que el docente las evalúe manualmente."}
             </p>
             <div className="flex items-center justify-center md:justify-start gap-4 text-xs text-muted-foreground font-semibold pt-1">
               <span>
-                Enviado el:{" "}
-                {intento.enviadoEn
-                  ? new Date(intento.enviadoEn).toLocaleDateString("es-ES", {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "N/A"}
+                {statusDateLabel}: {formattedStatusDate}
               </span>
             </div>
           </div>
 
           {/* Score circular display */}
           <div className="shrink-0">
-            {esCalificado ? (
+            {esCancelado ? (
+              <div className="h-32 w-32 rounded-full border-[6px] border-destructive/30 bg-destructive/5 flex flex-col items-center justify-center font-extrabold text-destructive text-center p-3">
+                <XCircle className="h-7 w-7 mb-1 shrink-0" />
+                <span className="text-xs tracking-tight leading-snug font-bold">
+                  Cancelado
+                </span>
+              </div>
+            ) : esCalificado ? (
               <div
                 className={`h-32 w-32 rounded-full border-[8px] flex flex-col items-center justify-center font-extrabold shadow-lg transition-colors ${ringColor}`}
               >

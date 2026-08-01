@@ -29,6 +29,7 @@ import {
 import {
   CheckCircle2,
   AlertTriangle,
+  Bot,
   RefreshCw,
   ArrowLeft,
   ArrowRight,
@@ -43,7 +44,7 @@ import Link from "next/link";
 import {
   formatCountdown,
   formatDuration,
-  getAttemptRemainingSeconds,
+  getActiveAttemptRemainingSeconds,
   getQuizEstimatedMinutes,
 } from "@/lib/quiz-rules";
 
@@ -51,6 +52,9 @@ type QuizAttempt = {
   id: string;
   cuestionarioId: string;
   creadoEn: Date | string;
+  estado: string;
+  reactivadoEn: Date | string | null;
+  tiempoRestanteSegundos: number | null;
   respuestas: Array<{
     id: string;
     preguntaId: string;
@@ -77,16 +81,26 @@ interface QuizFormProps {
     }>;
   };
   intento: QuizAttempt | null;
+  proctoringConfig: {
+    captureMinSeconds: number;
+    captureMaxSeconds: number;
+  };
 }
 
-export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
+export default function QuizForm({
+  cuestionario,
+  intento,
+  proctoringConfig,
+}: QuizFormProps) {
   const router = useRouter();
   const preguntas = cuestionario.preguntas;
   const duracionEstimada = getQuizEstimatedMinutes(preguntas);
   const totalDurationSeconds = duracionEstimada * 60;
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const finalizingRef = useRef(false);
   const historyGuardPushedRef = useRef(false);
+  const proctoringUploadRef = useRef(false);
   const [mediaStatus, setMediaStatus] = useState<
     "idle" | "checking" | "granted" | "denied" | "unsupported"
   >("idle");
@@ -94,7 +108,7 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
   const [activeAttempt, setActiveAttempt] = useState<QuizAttempt | null>(intento);
   const [remainingSeconds, setRemainingSeconds] = useState(() =>
     intento
-      ? getAttemptRemainingSeconds(intento.creadoEn, duracionEstimada)
+      ? getActiveAttemptRemainingSeconds(intento, duracionEstimada)
       : totalDurationSeconds
   );
 
@@ -154,7 +168,7 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
 
       setActiveAttempt(attempt);
       setRemainingSeconds(
-        getAttemptRemainingSeconds(attempt.creadoEn, duracionEstimada)
+        getActiveAttemptRemainingSeconds(attempt, duracionEstimada)
       );
       setRespuestas(answerMap);
       lastSavedRef.current = Object.fromEntries(
@@ -201,11 +215,104 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
     [activeAttempt, cuestionario.id, router]
   );
 
+  const redirectToProctoringPause = useCallback(() => {
+    finalizingRef.current = true;
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    router.replace(`/usuario/cuestionarios/${cuestionario.id}/pausado`);
+    router.refresh();
+  }, [cuestionario.id, router]);
+
+  const redirectToCanceledResult = useCallback(() => {
+    finalizingRef.current = true;
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    router.replace(`/usuario/cuestionarios/${cuestionario.id}/resultado`);
+    router.refresh();
+  }, [cuestionario.id, router]);
+
+  const captureProctoringSnapshot = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      return null;
+    }
+
+    const sourceWidth = video.videoWidth || 640;
+    const sourceHeight = video.videoHeight || 480;
+    const targetWidth = Math.min(sourceWidth, 960);
+    const targetHeight = Math.round(sourceHeight * (targetWidth / sourceWidth));
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+
+    context.drawImage(video, 0, 0, targetWidth, targetHeight);
+
+    return new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", 0.72);
+    });
+  }, []);
+
+  const uploadProctoringSnapshot = useCallback(async () => {
+    if (!activeAttempt || proctoringUploadRef.current) return;
+
+    const snapshot = await captureProctoringSnapshot();
+    if (!snapshot) return;
+
+    proctoringUploadRef.current = true;
+    try {
+      const formData = new FormData();
+      formData.append("snapshot", snapshot, "snapshot.jpg");
+
+      const response = await fetch(
+        `/api/intentos/${activeAttempt.id}/proctoring/snapshot`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) return;
+
+      const data = (await response.json()) as {
+        paused?: boolean;
+        estado?: string;
+      };
+
+      if (data.paused || data.estado === "PAUSADO_REVISION_IA") {
+        redirectToProctoringPause();
+      }
+    } catch (error) {
+      console.error("Error al enviar snapshot de proctoring:", error);
+    } finally {
+      proctoringUploadRef.current = false;
+    }
+  }, [activeAttempt, captureProctoringSnapshot, redirectToProctoringPause]);
+
   useEffect(() => {
     return () => {
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
+
+  useEffect(() => {
+    if (mediaStatus !== "granted" || !activeAttempt || !videoRef.current) return;
+
+    const video = videoRef.current;
+    const stream = mediaStreamRef.current;
+    if (!stream) return;
+
+    video.srcObject = stream;
+    void video.play().catch((error) => {
+      console.error("No se pudo iniciar el video de proctoring:", error);
+    });
+
+    return () => {
+      if (video.srcObject === stream) {
+        video.srcObject = null;
+      }
+    };
+  }, [activeAttempt, mediaStatus]);
 
   useEffect(() => {
     if (mediaStatus !== "granted" || !activeAttempt) return;
@@ -350,8 +457,8 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
     if (mediaStatus !== "granted" || !activeAttempt) return;
 
     const updateCountdown = () => {
-      const nextRemainingSeconds = getAttemptRemainingSeconds(
-        activeAttempt.creadoEn,
+      const nextRemainingSeconds = getActiveAttemptRemainingSeconds(
+        activeAttempt,
         duracionEstimada
       );
 
@@ -371,6 +478,81 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
       window.clearInterval(intervalId);
     };
   }, [activeAttempt, duracionEstimada, finishAttemptForSecurity, mediaStatus]);
+
+  useEffect(() => {
+    if (mediaStatus !== "granted" || !activeAttempt) return;
+
+    let timeoutId: number | undefined;
+    let stopped = false;
+
+    const scheduleNextSnapshot = () => {
+      const minSeconds = proctoringConfig.captureMinSeconds;
+      const maxSeconds = Math.max(minSeconds, proctoringConfig.captureMaxSeconds);
+      const delaySeconds =
+        minSeconds + Math.random() * (maxSeconds - minSeconds);
+
+      timeoutId = window.setTimeout(async () => {
+        await uploadProctoringSnapshot();
+        if (!stopped) {
+          scheduleNextSnapshot();
+        }
+      }, delaySeconds * 1000);
+    };
+
+    scheduleNextSnapshot();
+
+    return () => {
+      stopped = true;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [
+    activeAttempt,
+    mediaStatus,
+    proctoringConfig.captureMaxSeconds,
+    proctoringConfig.captureMinSeconds,
+    uploadProctoringSnapshot,
+  ]);
+
+  useEffect(() => {
+    if (mediaStatus !== "granted" || !activeAttempt) return;
+
+    const checkAttemptStatus = async () => {
+      try {
+        const response = await fetch(
+          `/api/intentos/${activeAttempt.id}/proctoring/status`,
+          { cache: "no-store" }
+        );
+        if (!response.ok) return;
+
+        const data = (await response.json()) as {
+          paused?: boolean;
+          canceled?: boolean;
+          estado?: string;
+        };
+
+        if (data.paused || data.estado === "PAUSADO_REVISION_IA") {
+          redirectToProctoringPause();
+        } else if (data.canceled || data.estado === "CANCELADO_CONFIRMADO") {
+          redirectToCanceledResult();
+        }
+      } catch (error) {
+        console.error("Error al consultar estado de proctoring:", error);
+      }
+    };
+
+    const intervalId = window.setInterval(checkAttemptStatus, 5000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [
+    activeAttempt,
+    mediaStatus,
+    redirectToCanceledResult,
+    redirectToProctoringPause,
+  ]);
 
   // Number of completed answers
   const totalRespondidas = preguntas.filter((p) => {
@@ -509,19 +691,37 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
           Para iniciar este examen debes conceder acceso a la camara y al
           microfono. Si no das permiso, no podras responderlo.
         </p>
-        <div className="mx-auto mt-8 flex max-w-4xl items-start gap-5 rounded-2xl border border-destructive/40 bg-destructive/10 p-5 text-left sm:p-6">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-destructive/15 text-destructive">
-            <ShieldAlert className="h-6 w-6" />
+        <div className="mx-auto mt-8 grid max-w-4xl gap-4 text-left">
+          <div className="flex items-start gap-5 rounded-2xl border border-primary/40 bg-primary/10 p-5 sm:p-6">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <Bot className="h-6 w-6" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-bold text-foreground">
+                Monitoreo con IA
+              </p>
+              <p className="text-base leading-7 text-muted-foreground">
+                Durante el examen una IA revisara capturas periodicas de la
+                camara para detectar posibles irregularidades. Si algo requiere
+                atencion, el intento se pausara para revision humana; la IA no
+                cancela el examen por si sola.
+              </p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <p className="text-lg font-bold text-foreground">
-              Aviso de seguridad del examen
-            </p>
-            <p className="text-base leading-7 text-muted-foreground">
-              Si cambias de pestana, abres otra ventana, sales del navegador o
-              el examen pierde el foco, el intento se finalizara
-              automaticamente con las respuestas guardadas hasta ese momento.
-            </p>
+          <div className="flex items-start gap-5 rounded-2xl border border-destructive/40 bg-destructive/10 p-5 sm:p-6">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-destructive/15 text-destructive">
+              <ShieldAlert className="h-6 w-6" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-bold text-foreground">
+                Aviso de seguridad del examen
+              </p>
+              <p className="text-base leading-7 text-muted-foreground">
+                Si cambias de pestana, abres otra ventana, sales del navegador o
+                el examen pierde el foco, el intento se finalizara
+                automaticamente con las respuestas guardadas hasta ese momento.
+              </p>
+            </div>
           </div>
         </div>
         <Button
@@ -547,6 +747,14 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
 
   return (
     <div className="space-y-6">
+      <video
+        ref={videoRef}
+        muted
+        playsInline
+        autoPlay
+        className="sr-only"
+        aria-hidden="true"
+      />
       {/* Sticky Top Header showing progress & autoguardado */}
       <header className="sticky top-[55px] z-40 bg-card/85 backdrop-blur-xl border border-border/50 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -582,6 +790,11 @@ export default function QuizForm({ cuestionario, intento }: QuizFormProps) {
               >
                 <Clock3 className="h-3 w-3" />
                 Tiempo: {formatCountdown(remainingSeconds)}
+              </span>
+              <span className="shrink-0">/</span>
+              <span className="flex items-center gap-1.5 font-bold text-emerald-400 shrink-0">
+                <Camera className="h-3 w-3" />
+                Camara activa
               </span>
               <span className="shrink-0">/</span>
               <span className="flex items-center gap-1.5 font-medium shrink-0">

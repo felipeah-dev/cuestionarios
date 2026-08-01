@@ -2,8 +2,13 @@ import { getCurrentUser } from "@/lib/auth";
 import { finalizeQuizAttemptForUser } from "@/lib/quiz-finalization";
 import { prisma } from "@/lib/prisma";
 import {
-  getAttemptRemainingSeconds,
+  getProctoringCaptureMaxSeconds,
+  getProctoringCaptureMinSeconds,
+} from "@/lib/proctoring/config";
+import {
+  getActiveAttemptRemainingSeconds,
   getQuizEstimatedMinutes,
+  isActiveAttemptStatus,
 } from "@/lib/quiz-rules";
 import { redirect } from "next/navigation";
 import QuizForm from "./_components/QuizForm";
@@ -47,14 +52,23 @@ export default async function ResponderCuestionarioPage({ params }: Props) {
     include: { respuestas: true },
   });
 
-  // If already submitted or graded, redirect immediately to results
-  if (intento && (intento.estado === "ENVIADO" || intento.estado === "CALIFICADO")) {
+  if (intento?.estado === "PAUSADO_REVISION_IA") {
+    redirect(`/usuario/cuestionarios/${id}/pausado`);
+  }
+
+  // If already submitted, graded, or cancelled by review, redirect immediately to results
+  if (
+    intento &&
+    (intento.estado === "ENVIADO" ||
+      intento.estado === "CALIFICADO" ||
+      intento.estado === "CANCELADO_CONFIRMADO")
+  ) {
     redirect(`/usuario/cuestionarios/${id}/resultado`);
   }
 
-  if (intento?.estado === "EN_PROGRESO") {
-    const remainingSeconds = getAttemptRemainingSeconds(
-      intento.creadoEn,
+  if (intento && isActiveAttemptStatus(intento.estado)) {
+    const remainingSeconds = getActiveAttemptRemainingSeconds(
+      intento,
       getQuizEstimatedMinutes(cuestionario.preguntas)
     );
 
@@ -70,7 +84,14 @@ export default async function ResponderCuestionarioPage({ params }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto py-2">
-      <QuizForm cuestionario={cuestionario} intento={intento} />
+      <QuizForm
+        cuestionario={cuestionario}
+        intento={intento}
+        proctoringConfig={{
+          captureMinSeconds: getProctoringCaptureMinSeconds(),
+          captureMaxSeconds: getProctoringCaptureMaxSeconds(),
+        }}
+      />
     </div>
   );
 }

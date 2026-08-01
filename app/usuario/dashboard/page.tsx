@@ -2,7 +2,15 @@ import React from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, CheckCircle, ArrowRight, Clock, Trophy } from "lucide-react";
+import {
+  BookOpen,
+  CheckCircle,
+  ArrowRight,
+  Clock,
+  Trophy,
+  ShieldAlert,
+  XCircle,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -20,14 +28,17 @@ export default async function UsuarioDashboardPage() {
             intentos: {
               some: {
                 usuarioId: user.id,
-                estado: { in: ["ENVIADO", "CALIFICADO"] },
+                estado: { in: ["ENVIADO", "CALIFICADO", "CANCELADO_CONFIRMADO"] },
               },
             },
           },
         },
       }),
       prisma.intento.count({
-        where: { usuarioId: user.id, estado: { in: ["ENVIADO", "CALIFICADO"] } },
+        where: {
+          usuarioId: user.id,
+          estado: { in: ["ENVIADO", "CALIFICADO", "CANCELADO_CONFIRMADO"] },
+        },
       }),
       prisma.intento.findMany({
         where: { usuarioId: user.id },
@@ -48,6 +59,24 @@ export default async function UsuarioDashboardPage() {
       return (
         <Badge className="bg-warning/10 text-warning border border-warning/20">
           <Clock className="h-3 w-3 mr-1" /> Pendiente
+        </Badge>
+      );
+    if (estado === "PAUSADO_REVISION_IA")
+      return (
+        <Badge className="bg-warning/10 text-warning border border-warning/20">
+          <ShieldAlert className="h-3 w-3 mr-1" /> Revision
+        </Badge>
+      );
+    if (estado === "CANCELADO_CONFIRMADO")
+      return (
+        <Badge className="bg-destructive/10 text-destructive border border-destructive/20">
+          <XCircle className="h-3 w-3 mr-1" /> Cancelado
+        </Badge>
+      );
+    if (estado === "REACTIVADO_POR_ADMIN")
+      return (
+        <Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+          Reactivado
         </Badge>
       );
     return (
@@ -154,7 +183,17 @@ export default async function UsuarioDashboardPage() {
                       </span>
                     </span>
                   )}
-                  <Link href={`/usuario/cuestionarios/${intento.cuestionarioId}/resultado`} className="p-2 hover:bg-muted rounded-md transition-colors">
+                  <Link
+                    href={
+                      intento.estado === "PAUSADO_REVISION_IA"
+                        ? `/usuario/cuestionarios/${intento.cuestionarioId}/pausado`
+                        : intento.estado === "EN_PROGRESO" ||
+                          intento.estado === "REACTIVADO_POR_ADMIN"
+                          ? `/usuario/cuestionarios/${intento.cuestionarioId}`
+                          : `/usuario/cuestionarios/${intento.cuestionarioId}/resultado`
+                    }
+                    className="p-2 hover:bg-muted rounded-md transition-colors"
+                  >
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>

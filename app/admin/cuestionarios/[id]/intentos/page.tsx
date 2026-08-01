@@ -24,6 +24,9 @@ const estadoConfig = {
   CALIFICADO: { label: "Calificado", className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-600" },
   ENVIADO:    { label: "Pendiente",  className: "border-amber-500/40 bg-amber-500/10 text-amber-600" },
   EN_PROGRESO:{ label: "En progreso",className: "border-border bg-muted text-muted-foreground" },
+  PAUSADO_REVISION_IA: { label: "Pausado IA", className: "border-warning/40 bg-warning/10 text-warning" },
+  REACTIVADO_POR_ADMIN: { label: "Reactivado", className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-600" },
+  CANCELADO_CONFIRMADO: { label: "Cancelado", className: "border-destructive/40 bg-destructive/10 text-destructive" },
 } as const;
 
 export default async function IntentosCuestionarioPage({ params }: Props) {
@@ -132,7 +135,11 @@ export default async function IntentosCuestionarioPage({ params }: Props) {
                           Calificar
                         </Link>
                       ) : (
-                        <span className="text-xs text-muted-foreground">En progreso</span>
+                        <span className="text-xs text-muted-foreground">
+                          {intento.estado === "PAUSADO_REVISION_IA"
+                            ? "Revisar proctoring"
+                            : "En progreso"}
+                        </span>
                       )}
                     </TableCell>
                   </TableRow>

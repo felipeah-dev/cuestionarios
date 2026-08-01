@@ -3,11 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, ClipboardList, BarChart3, Users } from "lucide-react";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  BarChart3,
+  Users,
+  ShieldAlert,
+} from "lucide-react";
 
 const adminItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/cuestionarios", label: "Cuestionarios", icon: ClipboardList },
+  { href: "/admin/proctoring", label: "Proctoring", icon: ShieldAlert },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
   { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },
 ];

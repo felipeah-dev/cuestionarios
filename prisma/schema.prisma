@@ -22,9 +22,25 @@ enum TipoPregunta {
 }
 
 enum EstadoIntento {
-  EN_PROGRESO  // El usuario está respondiendo
-  ENVIADO      // El usuario entregó, pendiente de calificar preguntas abiertas
-  CALIFICADO   // Todas las preguntas están calificadas, calificacion final guardada
+  EN_PROGRESO // El usuario está respondiendo
+  PAUSADO_REVISION_IA // Pausado temporalmente por una alerta de proctoring pendiente
+  REACTIVADO_POR_ADMIN // Reactivado por admin/profesor tras falso positivo
+  CANCELADO_CONFIRMADO // Cancelado por confirmación humana de irregularidad
+  ENVIADO // El usuario entregó, pendiente de calificar preguntas abiertas
+  CALIFICADO // Todas las preguntas están calificadas, calificacion final guardada
+}
+
+enum NivelAlertaProctoring {
+  BAJO
+  MEDIO
+  ALTO
+}
+
+enum EstadoRevisionProctoring {
+  PENDIENTE
+  CONFIRMADA
+  ANULADA_FALSO_POSITIVO
+  ERROR_IA
 }
 
 // ─────────────────────────────────────────
@@ -33,16 +49,18 @@ enum EstadoIntento {
 
 // Todos los usuarios del sistema: admins y usuarios regulares
 model Usuario {
-  id         String   @id @default(cuid())
-  nombre     String
-  email      String   @unique
-  password   String
-  rol        Rol      @default(USUARIO)
-  creadoEn   DateTime @default(now())
+  id       String   @id @default(cuid())
+  nombre   String
+  email    String   @unique
+  password String
+  rol      Rol      @default(USUARIO)
+  creadoEn DateTime @default(now())
 
   // Relaciones
-  cuestionarios Cuestionario[] // Cuestionarios que creó (solo admins)
-  intentos      Intento[]      // Intentos de cuestionarios (solo usuarios regulares)
+  cuestionarios              Cuestionario[] // Cuestionarios que creó (solo admins)
+  intentos                   Intento[] // Intentos de cuestionarios (solo usuarios regulares)
+  alertasProctoring          AlertaProctoring[] @relation("AlertaProctoringEstudiante")
+  alertasProctoringRevisadas AlertaProctoring[] @relation("AlertaProctoringRevisor")
 }
 
 // Cuestionario creado por un administrador
@@ -50,7 +68,7 @@ model Cuestionario {
   id          String   @id @default(cuid())
   titulo      String
   descripcion String?
-  adminId     String   // Admin que creó el cuestionario
+  adminId     String // Admin que creó el cuestionario
   creadoEn    DateTime @default(now())
 
   // Relaciones
@@ -66,12 +84,12 @@ model Pregunta {
   cuestionarioId String
   texto          String
   tipo           TipoPregunta
-  puntos         Float        // Puntaje máximo que vale esta pregunta
-  orden          Int          // Orden de aparición en el cuestionario
+  puntos         Float // Puntaje máximo que vale esta pregunta
+  orden          Int // Orden de aparición en el cuestionario
 
   // Relaciones
   cuestionario Cuestionario @relation(fields: [cuestionarioId], references: [id])
-  opciones     Opcion[]     // Solo aplica si tipo = OPCION_MULTIPLE
+  opciones     Opcion[] // Solo aplica si tipo = OPCION_MULTIPLE
   respuestas   Respuesta[]
 }
 
@@ -91,19 +109,49 @@ model Opcion {
 // Representa una sesión de un usuario respondiendo un cuestionario
 // calificacion se guarda aquí como desnormalización controlada para el reporte de gráfica
 model Intento {
-  id             String        @id @default(cuid())
-  cuestionarioId String
-  usuarioId      String
-  calificacion   Float?        // 0-100, se calcula y guarda al completar la calificación
-  estado         EstadoIntento @default(EN_PROGRESO)
-  creadoEn       DateTime      @default(now())
-  enviadoEn      DateTime?     // Cuando el usuario entregó
-  calificadoEn   DateTime?     // Cuando quedó completamente calificado
+  id                     String        @id @default(cuid())
+  cuestionarioId         String
+  usuarioId              String
+  calificacion           Float? // 0-100, se calcula y guarda al completar la calificación
+  estado                 EstadoIntento @default(EN_PROGRESO)
+  creadoEn               DateTime      @default(now())
+  enviadoEn              DateTime? // Cuando el usuario entregó
+  calificadoEn           DateTime? // Cuando quedó completamente calificado
+  pausadoEn              DateTime? // Cuando IA pauso temporalmente el intento
+  reactivadoEn           DateTime? // Cuando el alumno retomo un intento habilitado
+  canceladoEn            DateTime? // Cuando admin/profesor confirmo cancelacion
+  tiempoRestanteSegundos Int? // Segundos disponibles al pausar por revision IA
 
   // Relaciones
-  cuestionario Cuestionario @relation(fields: [cuestionarioId], references: [id])
-  usuario      Usuario      @relation(fields: [usuarioId], references: [id])
-  respuestas   Respuesta[]
+  cuestionario      Cuestionario       @relation(fields: [cuestionarioId], references: [id])
+  usuario           Usuario            @relation(fields: [usuarioId], references: [id])
+  respuestas        Respuesta[]
+  alertasProctoring AlertaProctoring[]
+}
+
+model AlertaProctoring {
+  id             String                   @id @default(cuid())
+  intentoId      String
+  estudianteId   String
+  snapshotPath   String
+  modelUsed      String
+  aiResultJson   Json
+  nivelAlerta    NivelAlertaProctoring
+  confianza      Float
+  estadoRevision EstadoRevisionProctoring @default(PENDIENTE)
+  revisadoPorId  String?
+  revisadoEn     DateTime?
+  creadoEn       DateTime                 @default(now())
+  actualizadoEn  DateTime                 @updatedAt
+
+  intento     Intento  @relation(fields: [intentoId], references: [id], onDelete: Cascade)
+  estudiante  Usuario  @relation("AlertaProctoringEstudiante", fields: [estudianteId], references: [id])
+  revisadoPor Usuario? @relation("AlertaProctoringRevisor", fields: [revisadoPorId], references: [id])
+
+  @@index([intentoId])
+  @@index([estudianteId])
+  @@index([estadoRevision])
+  @@index([nivelAlerta])
 }
 
 // Respuesta de un usuario a una pregunta dentro de un intento
@@ -116,7 +164,7 @@ model Respuesta {
   preguntaId       String
   opcionId         String? // Solo para OPCION_MULTIPLE
   respuestaAbierta String? // Solo para ABIERTA
-  puntajeObtenido  Float?  // null hasta que se califique
+  puntajeObtenido  Float? // null hasta que se califique
 
   // Relaciones
   intento  Intento  @relation(fields: [intentoId], references: [id])

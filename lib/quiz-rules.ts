@@ -4,8 +4,26 @@ type QuestionLike = {
   tipo: QuizQuestionType;
 };
 
+type AttemptTimingLike = {
+  estado?: string;
+  creadoEn: Date | string;
+  reactivadoEn?: Date | string | null;
+  tiempoRestanteSegundos?: number | null;
+};
+
 export const MULTIPLE_CHOICE_MINUTES = 1;
 export const OPEN_QUESTION_MINUTES = 5;
+
+export const ACTIVE_ATTEMPT_STATUSES = [
+  "EN_PROGRESO",
+  "REACTIVADO_POR_ADMIN",
+] as const;
+
+export function isActiveAttemptStatus(estado: string) {
+  return ACTIVE_ATTEMPT_STATUSES.includes(
+    estado as (typeof ACTIVE_ATTEMPT_STATUSES)[number]
+  );
+}
 
 export function getQuestionEstimatedMinutes(tipo: QuizQuestionType) {
   return tipo === "ABIERTA" ? OPEN_QUESTION_MINUTES : MULTIPLE_CHOICE_MINUTES;
@@ -27,11 +45,64 @@ export function getAttemptRemainingSeconds(
   durationMinutes: number,
   now: Date = new Date()
 ) {
-  const startedAt = new Date(creadoEn).getTime();
-  const durationMs = durationMinutes * 60 * 1000;
-  const remainingMs = startedAt + durationMs - now.getTime();
+  return getRemainingSecondsFromStart(creadoEn, durationMinutes * 60, now);
+}
+
+export function getRemainingSecondsFromStart(
+  startedAt: Date | string,
+  durationSeconds: number,
+  now: Date = new Date()
+) {
+  const startedAtMs = new Date(startedAt).getTime();
+  const durationMs = durationSeconds * 1000;
+  const remainingMs = startedAtMs + durationMs - now.getTime();
 
   return Math.max(0, Math.ceil(remainingMs / 1000));
+}
+
+export function getAttemptTimingStart(intento: AttemptTimingLike) {
+  if (intento.estado === "REACTIVADO_POR_ADMIN" && intento.reactivadoEn) {
+    return intento.reactivadoEn;
+  }
+
+  return intento.creadoEn;
+}
+
+export function getActiveAttemptRemainingSeconds(
+  intento: AttemptTimingLike,
+  durationMinutes: number,
+  now: Date = new Date()
+) {
+  const storedRemainingSeconds =
+    typeof intento.tiempoRestanteSegundos === "number"
+      ? Math.max(0, intento.tiempoRestanteSegundos)
+      : null;
+
+  if (intento.estado === "PAUSADO_REVISION_IA" && storedRemainingSeconds !== null) {
+    return storedRemainingSeconds;
+  }
+
+  if (intento.estado === "REACTIVADO_POR_ADMIN") {
+    if (storedRemainingSeconds !== null) {
+      if (!intento.reactivadoEn) return storedRemainingSeconds;
+
+      return getRemainingSecondsFromStart(
+        intento.reactivadoEn,
+        storedRemainingSeconds,
+        now
+      );
+    }
+
+    if (intento.reactivadoEn) {
+      return getAttemptRemainingSeconds(intento.reactivadoEn, durationMinutes, now);
+    }
+  }
+
+  return getAttemptRemainingSeconds(
+    intento.creadoEn,
+    durationMinutes,
+    now
+  );
 }
 
 export function formatCountdown(totalSeconds: number) {

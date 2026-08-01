@@ -5,7 +5,15 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { FileText, Award, Calendar, ChevronRight, Clock } from "lucide-react";
+import {
+  FileText,
+  Award,
+  Calendar,
+  ChevronRight,
+  Clock,
+  ShieldAlert,
+  XCircle,
+} from "lucide-react";
 import {
   clampPercentage,
   formatDuration,
@@ -63,10 +71,7 @@ export default async function UsuarioCuestionariosPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cuestionarios.map((c) => {
             const ultimoIntento = c.intentos[0];
-            const intentoRealmenteIniciado =
-              !!ultimoIntento &&
-              (ultimoIntento.estado !== "EN_PROGRESO" ||
-                ultimoIntento._count.respuestas > 0);
+            const intentoRealmenteIniciado = !!ultimoIntento;
             const totalPreguntas = c.preguntas.length;
             const puntosTotales = c.preguntas.reduce((acc, p) => acc + p.puntos, 0);
             const duracionEstimada = getQuizEstimatedMinutes(c.preguntas);
@@ -80,16 +85,45 @@ export default async function UsuarioCuestionariosPage() {
             );
 
             if (ultimoIntento && intentoRealmenteIniciado) {
-              if (ultimoIntento.estado === "EN_PROGRESO") {
+              if (
+                ultimoIntento.estado === "EN_PROGRESO" ||
+                ultimoIntento.estado === "REACTIVADO_POR_ADMIN"
+              ) {
                 statusBadge = (
                   <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border border-amber-500/20 font-semibold text-xs py-0.5 px-2">
-                    En Progreso
+                    {ultimoIntento.estado === "REACTIVADO_POR_ADMIN"
+                      ? "Reactivado"
+                      : "En Progreso"}
                   </Badge>
                 );
                 actionButton = (
                   <Button render={<Link href={`/usuario/cuestionarios/${c.id}`} />} nativeButton={false} className="w-full bg-amber-600 hover:bg-amber-700 shadow-md shadow-amber-500/10 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 font-bold text-white">
                     Continuar Intento
                     <Clock className="h-4 w-4" />
+                  </Button>
+                );
+              } else if (ultimoIntento.estado === "PAUSADO_REVISION_IA") {
+                statusBadge = (
+                  <Badge variant="outline" className="bg-warning/10 text-warning border border-warning/20 font-semibold text-xs py-0.5 px-2">
+                    En Revision
+                  </Badge>
+                );
+                actionButton = (
+                  <Button render={<Link href={`/usuario/cuestionarios/${c.id}/pausado`} />} nativeButton={false} variant="outline" className="w-full border-warning/30 text-warning hover:bg-warning/10 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 font-bold">
+                    Ver Revision
+                    <ShieldAlert className="h-4 w-4" />
+                  </Button>
+                );
+              } else if (ultimoIntento.estado === "CANCELADO_CONFIRMADO") {
+                statusBadge = (
+                  <Badge variant="outline" className="bg-destructive/10 text-destructive border border-destructive/20 font-semibold text-xs py-0.5 px-2">
+                    Cancelado
+                  </Badge>
+                );
+                actionButton = (
+                  <Button render={<Link href={`/usuario/cuestionarios/${c.id}/resultado`} />} nativeButton={false} variant="outline" className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 font-bold">
+                    Ver Estado
+                    <XCircle className="h-4 w-4" />
                   </Button>
                 );
               } else if (ultimoIntento.estado === "ENVIADO") {

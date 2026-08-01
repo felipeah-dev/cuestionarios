@@ -6,8 +6,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { finalizeQuizAttemptForUser } from "@/lib/quiz-finalization";
 import { prisma } from "@/lib/prisma";
 import {
-  getAttemptRemainingSeconds,
+  ACTIVE_ATTEMPT_STATUSES,
+  getActiveAttemptRemainingSeconds,
   getQuizEstimatedMinutes,
+  isActiveAttemptStatus,
 } from "@/lib/quiz-rules";
 
 export async function saveAnswerAction(
@@ -24,7 +26,7 @@ export async function saveAnswerAction(
     where: {
       id: intentoId,
       usuarioId: user.id,
-      estado: "EN_PROGRESO",
+      estado: { in: [...ACTIVE_ATTEMPT_STATUSES] },
       cuestionario: {
         preguntas: {
           some: { id: preguntaId },
@@ -46,8 +48,8 @@ export async function saveAnswerAction(
     throw new Error("Intento no encontrado o ya finalizado");
   }
 
-  const remainingSeconds = getAttemptRemainingSeconds(
-    intento.creadoEn,
+  const remainingSeconds = getActiveAttemptRemainingSeconds(
+    intento,
     getQuizEstimatedMinutes(intento.cuestionario.preguntas)
   );
 
@@ -113,19 +115,40 @@ export async function startQuizAttemptAction(cuestionarioId: string) {
     include: { respuestas: true },
   });
 
-  if (latestAttempt?.estado === "ENVIADO" || latestAttempt?.estado === "CALIFICADO") {
+  if (
+    latestAttempt?.estado === "ENVIADO" ||
+    latestAttempt?.estado === "CALIFICADO" ||
+    latestAttempt?.estado === "CANCELADO_CONFIRMADO"
+  ) {
     throw new Error("Este cuestionario ya fue enviado");
   }
 
-  if (latestAttempt?.estado === "EN_PROGRESO") {
-    const remainingSeconds = getAttemptRemainingSeconds(
-      latestAttempt.creadoEn,
+  if (latestAttempt?.estado === "PAUSADO_REVISION_IA") {
+    throw new Error("Este intento esta pausado para revision");
+  }
+
+  if (latestAttempt && isActiveAttemptStatus(latestAttempt.estado)) {
+    let activeAttempt = latestAttempt;
+
+    if (
+      activeAttempt.estado === "REACTIVADO_POR_ADMIN" &&
+      !activeAttempt.reactivadoEn
+    ) {
+      activeAttempt = await prisma.intento.update({
+        where: { id: activeAttempt.id },
+        data: { reactivadoEn: new Date() },
+        include: { respuestas: true },
+      });
+    }
+
+    const remainingSeconds = getActiveAttemptRemainingSeconds(
+      activeAttempt,
       getQuizEstimatedMinutes(cuestionario.preguntas)
     );
 
     if (remainingSeconds <= 0) {
       const result = await finalizeQuizAttemptForUser({
-        intentoId: latestAttempt.id,
+        intentoId: activeAttempt.id,
         usuarioId: user.id,
       });
 
@@ -135,7 +158,7 @@ export async function startQuizAttemptAction(cuestionarioId: string) {
       throw new Error("El tiempo del examen ya termino");
     }
 
-    return latestAttempt;
+    return activeAttempt;
   }
 
   return prisma.intento.create({

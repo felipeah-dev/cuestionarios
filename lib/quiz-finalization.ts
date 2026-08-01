@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { calculateFinalPercentage } from "@/lib/quiz-rules";
+import { calculateFinalPercentage, isActiveAttemptStatus } from "@/lib/quiz-rules";
 
 type FinalizeQuizAttemptInput = {
   intentoId: string;
@@ -34,7 +34,7 @@ export async function finalizeQuizAttemptForUser({
     throw new Error("Intento no encontrado");
   }
 
-  if (intento.estado !== "EN_PROGRESO") {
+  if (!isActiveAttemptStatus(intento.estado)) {
     return {
       cuestionarioId: intento.cuestionarioId,
       estado: intento.estado,
