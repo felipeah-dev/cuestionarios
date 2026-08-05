@@ -32,12 +32,18 @@ function preguntaVacia(orden: number) {
 interface Props {
   defaultValues?: CuestionarioFormValues;
   onSubmit: (data: CuestionarioFormValues) => Promise<{ ok: boolean }>;
+  grupos: Array<{ id: string; nombre: string; codigo: string }>;
   submitLabel?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function CuestionarioForm({ defaultValues, onSubmit, submitLabel = "Guardar" }: Props) {
+export function CuestionarioForm({
+  defaultValues,
+  onSubmit,
+  grupos,
+  submitLabel = "Guardar",
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -47,6 +53,7 @@ export function CuestionarioForm({ defaultValues, onSubmit, submitLabel = "Guard
     defaultValues: defaultValues ?? {
       titulo: "",
       descripcion: "",
+      grupoId: grupos.length === 1 ? grupos[0].id : "",
       preguntas: [preguntaVacia(1)],
     },
   });
@@ -126,6 +133,34 @@ export function CuestionarioForm({ defaultValues, onSubmit, submitLabel = "Guard
               placeholder="Instrucciones generales, temas cubiertos..."
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none placeholder:text-muted-foreground"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="grupoId" className="text-sm font-medium text-foreground">
+              Materia o grupo <span className="text-destructive">*</span>
+            </label>
+            <select
+              id="grupoId"
+              {...form.register("grupoId")}
+              className={`h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${
+                form.formState.errors.grupoId ? "border-destructive" : "border-input"
+              }`}
+            >
+              <option value="">Selecciona una materia o grupo</option>
+              {grupos.map((grupo) => (
+                <option key={grupo.id} value={grupo.id}>
+                  {grupo.nombre} ({grupo.codigo})
+                </option>
+              ))}
+            </select>
+            {form.formState.errors.grupoId && (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.grupoId.message}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Solo los alumnos inscritos en este grupo podran ver el cuestionario.
+            </p>
           </div>
         </div>
 

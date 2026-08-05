@@ -47,6 +47,7 @@ export const CuestionarioInput = z
   .object({
     titulo: z.string().min(1, "El titulo es requerido"),
     descripcion: z.string().optional(),
+    grupoId: z.string().min(1, "Selecciona la materia o grupo"),
     preguntas: z.array(PreguntaInput).min(1, "Debe tener al menos una pregunta"),
   })
   .superRefine((val, ctx) => {

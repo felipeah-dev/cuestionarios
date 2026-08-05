@@ -6,7 +6,16 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Iniciando la siembra (seeding) de la base de datos...");
 
-  // Clean existing test users if they exist to avoid unique constraint violations
+  // Clean dependent records first so the seed can be executed more than once.
+  await prisma.alertaProctoring.deleteMany({});
+  await prisma.respuesta.deleteMany({});
+  await prisma.intento.deleteMany({});
+  await prisma.opcion.deleteMany({});
+  await prisma.pregunta.deleteMany({});
+  await prisma.cuestionario.deleteMany({});
+  await prisma.grupoMiembro.deleteMany({});
+  await prisma.grupo.deleteMany({});
+
   await prisma.usuario.deleteMany({
     where: {
       email: {
@@ -36,12 +45,17 @@ async function main() {
     },
   });
 
-  // Clean existing records to avoid unique constraint or duplicate key violations
-  await prisma.respuesta.deleteMany({});
-  await prisma.intento.deleteMany({});
-  await prisma.opcion.deleteMany({});
-  await prisma.pregunta.deleteMany({});
-  await prisma.cuestionario.deleteMany({});
+  const grupo = await prisma.grupo.create({
+    data: {
+      nombre: "Programacion de software",
+      descripcion: "Grupo de prueba para cuestionarios de desarrollo de software.",
+      codigo: "DEV123",
+      adminId: admin.id,
+      miembros: {
+        create: { usuarioId: usuario.id },
+      },
+    },
+  });
 
   // 1. Cuestionario 1: Trivia de JavaScript (Solo opción múltiple)
   const cuestionario1 = await prisma.cuestionario.create({
@@ -49,6 +63,7 @@ async function main() {
       titulo: "Fundamentos de JavaScript",
       descripcion: "Evalúa tus conocimientos sobre variables, tipos de datos y funciones en JS.",
       adminId: admin.id,
+      grupoId: grupo.id,
       preguntas: {
         create: [
           {
@@ -90,6 +105,7 @@ async function main() {
       titulo: "Historia Universal y Filosofía",
       descripcion: "Cuestionario mixto con preguntas de opción múltiple y de desarrollo abierto.",
       adminId: admin.id,
+      grupoId: grupo.id,
       preguntas: {
         create: [
           {
@@ -120,6 +136,7 @@ async function main() {
   console.log("Seeding completado con éxito:");
   console.log(`- Administrador: ${admin.email} (Rol: ${admin.rol})`);
   console.log(`- Usuario regular: ${usuario.email} (Rol: ${usuario.rol})`);
+  console.log(`- Grupo: ${grupo.nombre} (Codigo: ${grupo.codigo})`);
   console.log(`- Cuestionario 1: ${cuestionario1.titulo} (ID: ${cuestionario1.id})`);
   console.log(`- Cuestionario 2: ${cuestionario2.titulo} (ID: ${cuestionario2.id})`);
 }

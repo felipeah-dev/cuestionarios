@@ -24,6 +24,10 @@ export default async function UsuarioDashboardPage() {
     await Promise.all([
       prisma.cuestionario.count({
         where: {
+          OR: [
+            { grupoId: null },
+            { grupo: { miembros: { some: { usuarioId: user.id } } } },
+          ],
           NOT: {
             intentos: {
               some: {

@@ -7,6 +7,7 @@ import { getCuestionario, editarCuestionario } from "../../_actions";
 import { prisma } from "@/lib/prisma";
 import type { CuestionarioFormValues } from "@/lib/schemas/cuestionario";
 import type { CuestionarioConPreguntas } from "../../_actions";
+import { listarGruposDelAdmin } from "../../../grupos/_actions";
 
 type Pregunta = CuestionarioConPreguntas["preguntas"][number];
 type Opcion = Pregunta["opciones"][number];
@@ -18,9 +19,10 @@ interface Props {
 export default async function EditarCuestionarioPage({ params }: Props) {
   const { id } = await params;
 
-  const [cuestionario, intentoCount] = await Promise.all([
+  const [cuestionario, intentoCount, grupos] = await Promise.all([
     getCuestionario(id),
     prisma.intento.count({ where: { cuestionarioId: id } }),
+    listarGruposDelAdmin(),
   ]);
 
   if (!cuestionario) notFound();
@@ -91,6 +93,7 @@ export default async function EditarCuestionarioPage({ params }: Props) {
   const defaultValues: CuestionarioFormValues = {
     titulo: cuestionario.titulo,
     descripcion: cuestionario.descripcion ?? "",
+    grupoId: cuestionario.grupoId ?? "",
     preguntas: cuestionario.preguntas.map((p: Pregunta) => ({
       texto: p.texto,
       tipo: p.tipo,
@@ -113,6 +116,11 @@ export default async function EditarCuestionarioPage({ params }: Props) {
       {header}
       <CuestionarioForm
         defaultValues={defaultValues}
+        grupos={grupos.map(({ id: grupoId, nombre, codigo }) => ({
+          id: grupoId,
+          nombre,
+          codigo,
+        }))}
         onSubmit={handleEdit}
         submitLabel="Guardar cambios"
       />

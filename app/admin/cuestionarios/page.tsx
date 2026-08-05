@@ -61,6 +61,7 @@ export default async function AdminCuestionariosPage() {
               <TableRow className="bg-muted/40">
                 <TableHead className="font-semibold">Título</TableHead>
                 <TableHead className="font-semibold">Descripción</TableHead>
+                <TableHead className="font-semibold">Materia</TableHead>
                 <TableHead className="font-semibold text-center">Preguntas</TableHead>
                 <TableHead className="font-semibold text-center">Intentos</TableHead>
                 <TableHead className="font-semibold">Creado</TableHead>
@@ -73,6 +74,18 @@ export default async function AdminCuestionariosPage() {
                   <TableCell className="font-medium text-foreground">{c.titulo}</TableCell>
                   <TableCell className="text-muted-foreground text-sm max-w-xs truncate">
                     {c.descripcion ?? <span className="italic">Sin descripción</span>}
+                  </TableCell>
+                  <TableCell>
+                    {c.grupo ? (
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{c.grupo.nombre}</p>
+                        <p className="font-mono text-[11px] tracking-wider text-muted-foreground">
+                          {c.grupo.codigo}
+                        </p>
+                      </div>
+                    ) : (
+                      <Badge variant="outline">General</Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline">{c._count.preguntas}</Badge>

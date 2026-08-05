@@ -9,10 +9,12 @@ import {
   BarChart3,
   Users,
   ShieldAlert,
+  GraduationCap,
 } from "lucide-react";
 
 const adminItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/grupos", label: "Grupos", icon: GraduationCap },
   { href: "/admin/cuestionarios", label: "Cuestionarios", icon: ClipboardList },
   { href: "/admin/proctoring", label: "Proctoring", icon: ShieldAlert },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
@@ -21,6 +23,7 @@ const adminItems = [
 
 const usuarioItems = [
   { href: "/usuario/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/usuario/grupos", label: "Materias", icon: GraduationCap },
   { href: "/usuario/cuestionarios", label: "Cuestionarios", icon: ClipboardList },
 ];
 

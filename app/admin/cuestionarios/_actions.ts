@@ -13,7 +13,9 @@ export type CuestionarioListItem = {
   titulo: string;
   descripcion: string | null;
   adminId: string;
+  grupoId: string | null;
   creadoEn: Date;
+  grupo: { id: string; nombre: string; codigo: string } | null;
   _count: { preguntas: number; intentos: number };
 };
 
@@ -22,6 +24,7 @@ export type CuestionarioConPreguntas = {
   titulo: string;
   descripcion: string | null;
   adminId: string;
+  grupoId: string | null;
   creadoEn: Date;
   preguntas: Array<{
     id: string;
@@ -72,7 +75,10 @@ export async function listarCuestionarios(): Promise<CuestionarioListItem[]> {
   const user = await requireAdmin();
   return prisma.cuestionario.findMany({
     where: { adminId: user.id },
-    include: { _count: { select: { preguntas: true, intentos: true } } },
+    include: {
+      grupo: { select: { id: true, nombre: true, codigo: true } },
+      _count: { select: { preguntas: true, intentos: true } },
+    },
     orderBy: { creadoEn: "desc" },
   });
 }
@@ -94,12 +100,19 @@ export async function crearCuestionario(raw: CuestionarioFormValues) {
   const user = await requireAdmin();
   const data = CuestionarioInput.parse(raw);
 
+  const grupo = await prisma.grupo.findFirst({
+    where: { id: data.grupoId, adminId: user.id },
+    select: { id: true },
+  });
+  if (!grupo) throw new Error("La materia seleccionada no existe o no te pertenece");
+
   // El create anidado es atómico en Prisma — no necesita $transaction
   const cuestionario = await prisma.cuestionario.create({
     data: {
       titulo: data.titulo,
       descripcion: data.descripcion,
       adminId: user.id,
+      grupoId: grupo.id,
       preguntas: { create: buildPreguntasCreate(data.preguntas) },
     },
   });
@@ -111,6 +124,12 @@ export async function crearCuestionario(raw: CuestionarioFormValues) {
 export async function editarCuestionario(id: string, raw: CuestionarioFormValues) {
   const user = await requireAdmin();
   const data = CuestionarioInput.parse(raw);
+
+  const grupo = await prisma.grupo.findFirst({
+    where: { id: data.grupoId, adminId: user.id },
+    select: { id: true },
+  });
+  if (!grupo) throw new Error("La materia seleccionada no existe o no te pertenece");
 
   const existing = await prisma.cuestionario.findFirst({
     where: { id, adminId: user.id },
@@ -138,6 +157,7 @@ export async function editarCuestionario(id: string, raw: CuestionarioFormValues
       data: {
         titulo: data.titulo,
         descripcion: data.descripcion,
+        grupoId: grupo.id,
         preguntas: { create: buildPreguntasCreate(data.preguntas) },
       },
     });

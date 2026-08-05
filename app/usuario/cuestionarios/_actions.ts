@@ -93,8 +93,14 @@ export async function startQuizAttemptAction(cuestionarioId: string) {
     throw new Error("No autorizado");
   }
 
-  const cuestionario = await prisma.cuestionario.findUnique({
-    where: { id: cuestionarioId },
+  const cuestionario = await prisma.cuestionario.findFirst({
+    where: {
+      id: cuestionarioId,
+      OR: [
+        { grupoId: null },
+        { grupo: { miembros: { some: { usuarioId: user.id } } } },
+      ],
+    },
     include: {
       preguntas: {
         select: { tipo: true },

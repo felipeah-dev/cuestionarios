@@ -9,8 +9,10 @@ import {
   FileText,
   Award,
   Calendar,
+  ChevronLeft,
   ChevronRight,
   Clock,
+  GraduationCap,
   ShieldAlert,
   XCircle,
 } from "lucide-react";
@@ -25,13 +27,47 @@ export const metadata = {
   description: "Lista de evaluaciones académicas disponibles para responder.",
 };
 
-export default async function UsuarioCuestionariosPage() {
+interface Props {
+  searchParams: Promise<{ grupo?: string | string[] }>;
+}
+
+export default async function UsuarioCuestionariosPage({ searchParams }: Props) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  const query = await searchParams;
+  const grupoId = typeof query.grupo === "string" ? query.grupo : null;
+  const grupoSeleccionado = grupoId
+    ? await prisma.grupo.findFirst({
+        where: {
+          id: grupoId,
+          miembros: { some: { usuarioId: user.id } },
+        },
+        select: {
+          id: true,
+          nombre: true,
+          descripcion: true,
+          codigo: true,
+        },
+      })
+    : null;
+
+  if (grupoId && !grupoSeleccionado) {
+    redirect("/usuario/grupos");
+  }
+
   // Fetch all questionnaires along with their questions and the current user's attempts in parallel
   const cuestionarios = await prisma.cuestionario.findMany({
+    where: grupoSeleccionado
+      ? { grupoId: grupoSeleccionado.id }
+      : {
+          OR: [
+            { grupoId: null },
+            { grupo: { miembros: { some: { usuarioId: user.id } } } },
+          ],
+        },
     include: {
+      grupo: { select: { nombre: true, codigo: true } },
       preguntas: {
         orderBy: { orden: "asc" },
       },
@@ -50,22 +86,62 @@ export default async function UsuarioCuestionariosPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-violet-400 bg-clip-text text-transparent sm:text-5xl">
-          Evaluaciones Disponibles
-        </h1>
-        <p className="text-muted-foreground text-sm sm:text-base max-w-2xl">
-          Responde tus exámenes asignados, revisa tu progreso y visualiza tus calificaciones al instante.
-        </p>
-      </div>
+      {grupoSeleccionado ? (
+        <div className="space-y-3">
+          <Link
+            href="/usuario/grupos"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Volver a mis materias
+          </Link>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-extrabold text-foreground">
+                {grupoSeleccionado.nombre}
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                {grupoSeleccionado.descripcion || "Sin descripcion proporcionada."}
+              </p>
+            </div>
+            <Badge variant="outline" className="w-fit font-mono tracking-[0.14em]">
+              {grupoSeleccionado.codigo}
+            </Badge>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-violet-400 bg-clip-text text-transparent sm:text-5xl">
+            Evaluaciones Disponibles
+          </h1>
+          <p className="text-muted-foreground text-sm sm:text-base max-w-2xl">
+            Responde tus exámenes asignados, revisa tu progreso y visualiza tus calificaciones al instante.
+          </p>
+        </div>
+      )}
 
       {cuestionarios.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-12 border border-dashed border-border rounded-2xl bg-card/30 backdrop-blur-sm text-center">
           <FileText className="h-12 w-12 text-muted-foreground/60 mb-4 stroke-1.5" />
-          <h3 className="text-lg font-bold">No hay cuestionarios disponibles</h3>
+          <h3 className="text-lg font-bold">
+            {grupoSeleccionado
+              ? "Esta materia aun no tiene cuestionarios"
+              : "No hay cuestionarios disponibles"}
+          </h3>
           <p className="text-muted-foreground text-sm mt-1 max-w-md">
-            Tu docente aún no ha publicado evaluaciones. Cuando lo haga, aparecerán en esta sección.
+            {grupoSeleccionado
+              ? "Cuando el profesor asigne un cuestionario a esta materia, aparecera aqui."
+              : "Tu docente aun no ha publicado evaluaciones. Cuando lo haga, apareceran en esta seccion."}
           </p>
+          <Button
+            render={<Link href="/usuario/grupos" />}
+            nativeButton={false}
+            variant="outline"
+            className="mt-4 gap-2"
+          >
+            <GraduationCap className="h-4 w-4" />
+            {grupoSeleccionado ? "Volver a mis materias" : "Unirme a una materia"}
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -183,6 +259,10 @@ export default async function UsuarioCuestionariosPage() {
                   <CardTitle className="text-xl font-bold tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-300">
                     {c.titulo}
                   </CardTitle>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                    <GraduationCap className="h-3.5 w-3.5" />
+                    {c.grupo?.nombre ?? "Cuestionario general"}
+                  </div>
                   <CardDescription className="text-xs text-muted-foreground line-clamp-2 leading-relaxed min-h-[32px]">
                     {c.descripcion || "Sin descripción proporcionada."}
                   </CardDescription>

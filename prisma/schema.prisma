@@ -58,6 +58,8 @@ model Usuario {
 
   // Relaciones
   cuestionarios              Cuestionario[] // Cuestionarios que creó (solo admins)
+  gruposCreados              Grupo[]
+  membresiasGrupo            GrupoMiembro[]
   intentos                   Intento[] // Intentos de cuestionarios (solo usuarios regulares)
   alertasProctoring          AlertaProctoring[] @relation("AlertaProctoringEstudiante")
   alertasProctoringRevisadas AlertaProctoring[] @relation("AlertaProctoringRevisor")
@@ -69,12 +71,46 @@ model Cuestionario {
   titulo      String
   descripcion String?
   adminId     String // Admin que creó el cuestionario
+  grupoId     String?
   creadoEn    DateTime @default(now())
 
   // Relaciones
   admin     Usuario    @relation(fields: [adminId], references: [id])
+  grupo     Grupo?     @relation(fields: [grupoId], references: [id], onDelete: SetNull)
   preguntas Pregunta[]
   intentos  Intento[]
+
+  @@index([grupoId])
+}
+
+// Materia o grupo creado por un administrador.
+model Grupo {
+  id          String   @id @default(cuid())
+  nombre      String
+  descripcion String?
+  codigo      String   @unique
+  adminId     String
+  creadoEn    DateTime @default(now())
+
+  admin         Usuario        @relation(fields: [adminId], references: [id])
+  miembros      GrupoMiembro[]
+  cuestionarios Cuestionario[]
+
+  @@index([adminId])
+}
+
+// Inscripcion de un alumno a una materia o grupo.
+model GrupoMiembro {
+  id        String   @id @default(cuid())
+  grupoId   String
+  usuarioId String
+  unidoEn   DateTime @default(now())
+
+  grupo   Grupo   @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([grupoId, usuarioId])
+  @@index([usuarioId])
 }
 
 // Pregunta dentro de un cuestionario

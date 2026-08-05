@@ -27,8 +27,14 @@ export default async function ResponderCuestionarioPage({ params }: Props) {
   if (!user) redirect("/login");
 
   // Fetch the questionnaire with questions ordered and options
-  const cuestionario = await prisma.cuestionario.findUnique({
-    where: { id },
+  const cuestionario = await prisma.cuestionario.findFirst({
+    where: {
+      id,
+      OR: [
+        { grupoId: null },
+        { grupo: { miembros: { some: { usuarioId: user.id } } } },
+      ],
+    },
     include: {
       preguntas: {
         orderBy: { orden: "asc" },
