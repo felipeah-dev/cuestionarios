@@ -116,7 +116,7 @@ export async function anularAlertaProctoringAction(alertId: string) {
       where: { id: alert.intentoId },
       data: {
         estado: "REACTIVADO_POR_ADMIN",
-        reactivadoEn: null,
+        reactivadoEn: now,
         pausadoEn: null,
         tiempoRestanteSegundos,
       },

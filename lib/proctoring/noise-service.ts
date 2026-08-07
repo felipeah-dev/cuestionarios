@@ -77,9 +77,17 @@ export async function processProctoringNoise({
   };
 
   const result = await prisma.$transaction(async (tx) => {
-    // Contar faltas ALTO existentes antes de crear la nueva
+    // Contar faltas ALTO existentes producidas en el periodo activo actual (tras reactivación si la hubo)
+    const faultWhere: Prisma.AlertaProctoringWhereInput = {
+      intentoId,
+      nivelAlerta: "ALTO",
+    };
+    if (intento.reactivadoEn) {
+      faultWhere.creadoEn = { gte: intento.reactivadoEn };
+    }
+
     const existingFaultCount = await tx.alertaProctoring.count({
-      where: { intentoId, nivelAlerta: "ALTO" },
+      where: faultWhere,
     });
 
     const alert = await tx.alertaProctoring.create({

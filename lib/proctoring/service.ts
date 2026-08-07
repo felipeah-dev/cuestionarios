@@ -110,7 +110,20 @@ export async function processProctoringSnapshot({
     aiResult = analysis.result;
     nivelAlerta = mapAlertLevel(analysis.result.nivel_alerta);
     confianza = analysis.result.confianza;
-    isHighAlert = nivelAlerta === "ALTO" && confianza >= threshold;
+    const hasInfractionFlag =
+      analysis.result.celular_detectado ||
+      analysis.result.mirada_fuera_de_pantalla ||
+      analysis.result.otra_persona_presente ||
+      analysis.result.material_no_permitido ||
+      analysis.result.camara_obstruida;
+
+    isHighAlert =
+      (nivelAlerta === "ALTO" && confianza >= threshold) ||
+      (hasInfractionFlag && (nivelAlerta === "MEDIO" || nivelAlerta === "ALTO") && confianza >= 0.65);
+
+    if (isHighAlert) {
+      nivelAlerta = "ALTO";
+    }
   } catch (error) {
     estadoRevision = "ERROR_IA";
     aiResult = {
@@ -122,9 +135,17 @@ export async function processProctoringSnapshot({
   const now = new Date();
 
   const result = await prisma.$transaction(async (tx) => {
-    // Contar faltas ALTO existentes antes de crear la nueva para decidir la acción
+    // Contar faltas ALTO existentes producidas en el periodo activo actual (tras reactivación si la hubo)
+    const faultWhere: Prisma.AlertaProctoringWhereInput = {
+      intentoId,
+      nivelAlerta: "ALTO",
+    };
+    if (intento.reactivadoEn) {
+      faultWhere.creadoEn = { gte: intento.reactivadoEn };
+    }
+
     const existingFaultCount = await tx.alertaProctoring.count({
-      where: { intentoId, nivelAlerta: "ALTO" },
+      where: faultWhere,
     });
 
     const alert = await tx.alertaProctoring.create({

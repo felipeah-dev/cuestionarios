@@ -674,6 +674,7 @@ export default function QuizForm({
 
     let stopped = false;
     let timeoutId: number | undefined;
+    let initialTimeoutId: number | undefined;
 
     const scheduleNextSnapshot = () => {
       const minSeconds = proctoringConfig.captureMinSeconds;
@@ -686,11 +687,16 @@ export default function QuizForm({
       }, delaySeconds * 1000);
     };
 
-    scheduleNextSnapshot();
+    // Toma rápida inicial a los 3 segundos de iniciar
+    initialTimeoutId = window.setTimeout(async () => {
+      await uploadProctoringSnapshot();
+      if (!stopped) scheduleNextSnapshot();
+    }, 3000);
 
     return () => {
       stopped = true;
       window.clearTimeout(timeoutId);
+      window.clearTimeout(initialTimeoutId);
     };
   }, [activeAttempt, mediaStatus, proctoringConfig, uploadProctoringSnapshot]);
 
