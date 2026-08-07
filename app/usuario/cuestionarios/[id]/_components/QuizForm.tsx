@@ -157,6 +157,8 @@ export default function QuizForm({
   // ── Refs de detección de ruido ──
   const noiseBaselineRef = useRef<number>(0);
   const noiseAboveStartRef = useRef<number | null>(null);
+  const lastNoiseTimeRef = useRef<number | null>(null);
+  const noiseBurstTimesRef = useRef<number[]>([]);
   const noiseCooldownRef = useRef(false);
   const noiseRecorderRef = useRef<MediaRecorder | null>(null);
   const noiseChunksRef = useRef<Blob[]>([]);
@@ -754,53 +756,80 @@ export default function QuizForm({
       setNoiseIsAboveThreshold(isAbove);
 
       if (isAbove && !noiseCooldownRef.current) {
+        const now = Date.now();
+        lastNoiseTimeRef.current = now;
+
         if (noiseAboveStartRef.current === null) {
-          noiseAboveStartRef.current = Date.now();
-        } else if (Date.now() - noiseAboveStartRef.current >= NOISE_SUSTAINED_MS) {
-          // Umbral sostenido 3s — iniciar grabación si no está grabando ya
-          if (!noiseRecorderRef.current && mediaStreamRef.current) {
-            noiseAboveStartRef.current = null;
-            noiseCooldownRef.current = true;
+          noiseAboveStartRef.current = now;
+        }
 
-            const audioOnlyStream = new MediaStream(
-              mediaStreamRef.current.getAudioTracks()
-            );
+        const sustainedMs = now - noiseAboveStartRef.current;
 
-            const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-              ? "audio/webm;codecs=opus"
-              : "audio/webm";
+        // Criterio 1: Ruido acumulado/sostenido (3 segundos, ignorando pausas breves de <600ms)
+        const isSustainedViolated = sustainedMs >= NOISE_SUSTAINED_MS;
 
-            const recorder = new MediaRecorder(audioOnlyStream, { mimeType });
-            noiseChunksRef.current = [];
-            noiseRecorderRef.current = recorder;
-            setNoiseIsRecording(true);
-
-            recorder.ondataavailable = (e) => {
-              if (e.data.size > 0) noiseChunksRef.current.push(e.data);
-            };
-
-            recorder.onstop = () => {
-              const blob = new Blob(noiseChunksRef.current, { type: mimeType });
-              noiseRecorderRef.current = null;
-              noiseChunksRef.current = [];
-              setNoiseIsRecording(false);
-              void sendNoiseRecording(blob);
-
-              // Liberar cooldown después del período definido
-              window.setTimeout(() => {
-                noiseCooldownRef.current = false;
-              }, NOISE_COOLDOWN_MS);
-            };
-
-            recorder.start();
-            window.setTimeout(() => {
-              if (recorder.state === "recording") recorder.stop();
-            }, NOISE_RECORDING_MS);
+        // Criterio 2: Ráfagas cortas repetidas (3 o más ráfagas de >800ms en una ventana de 25s)
+        let isBurstViolated = false;
+        if (sustainedMs >= 800) {
+          const recentBursts = noiseBurstTimesRef.current.filter((t) => now - t <= 25000);
+          if (!recentBursts.some((t) => now - t < 1500)) {
+            recentBursts.push(now);
+            noiseBurstTimesRef.current = recentBursts;
+          }
+          if (recentBursts.length >= 3) {
+            isBurstViolated = true;
           }
         }
+
+        if ((isSustainedViolated || isBurstViolated) && !noiseRecorderRef.current && mediaStreamRef.current) {
+          noiseAboveStartRef.current = null;
+          lastNoiseTimeRef.current = null;
+          noiseBurstTimesRef.current = [];
+          noiseCooldownRef.current = true;
+
+          const audioOnlyStream = new MediaStream(
+            mediaStreamRef.current.getAudioTracks()
+          );
+
+          const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+            ? "audio/webm;codecs=opus"
+            : "audio/webm";
+
+          const recorder = new MediaRecorder(audioOnlyStream, { mimeType });
+          noiseChunksRef.current = [];
+          noiseRecorderRef.current = recorder;
+          setNoiseIsRecording(true);
+
+          recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) noiseChunksRef.current.push(e.data);
+          };
+
+          recorder.onstop = () => {
+            const blob = new Blob(noiseChunksRef.current, { type: mimeType });
+            noiseRecorderRef.current = null;
+            noiseChunksRef.current = [];
+            setNoiseIsRecording(false);
+            void sendNoiseRecording(blob);
+
+            // Liberar cooldown después del período definido
+            window.setTimeout(() => {
+              noiseCooldownRef.current = false;
+            }, NOISE_COOLDOWN_MS);
+          };
+
+          recorder.start();
+          window.setTimeout(() => {
+            if (recorder.state === "recording") recorder.stop();
+          }, NOISE_RECORDING_MS);
+        }
       } else {
-        // El ruido bajó — resetear timer
-        noiseAboveStartRef.current = null;
+        // Tolerancia a pausas naturales al hablar (Speech Hangover):
+        // Solo reseteamos el temporizador si transcurren más de 600ms de silencio continuo.
+        const now = Date.now();
+        if (lastNoiseTimeRef.current && now - lastNoiseTimeRef.current > 600) {
+          noiseAboveStartRef.current = null;
+          lastNoiseTimeRef.current = null;
+        }
       }
 
       animFrameId = requestAnimationFrame(analyse);
