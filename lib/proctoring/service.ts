@@ -28,6 +28,7 @@ export type ProctoringFaultResult = {
   blocked: boolean;
   faultCount: number;
   estado: string;
+  descripcion?: string;
   alert: {
     id: string;
     nivelAlerta: string;
@@ -174,6 +175,10 @@ export async function processProctoringSnapshot({
 
   const blocked = result.shouldBlock;
   const warned = isHighAlert && !blocked;
+  const descripcion =
+    typeof (aiResult as Record<string, unknown>)?.descripcion_breve === "string"
+      ? ((aiResult as Record<string, unknown>).descripcion_breve as string)
+      : undefined;
 
   return {
     ok: true,
@@ -181,6 +186,7 @@ export async function processProctoringSnapshot({
     blocked,
     faultCount: result.newFaultCount,
     estado: blocked ? "PAUSADO_REVISION_IA" : intento.estado,
+    descripcion,
     alert: result.alert,
   };
 }

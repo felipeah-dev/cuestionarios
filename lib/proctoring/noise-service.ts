@@ -131,6 +131,7 @@ export async function processProctoringNoise({
     blocked,
     faultCount: result.newFaultCount,
     estado: blocked ? "PAUSADO_REVISION_IA" : intento.estado,
+    descripcion: "Ruido ambiental excesivo sostenido por 3 segundos continuos (+15 dB sobre el nivel base de silencio).",
     alert: result.alert,
   };
 }

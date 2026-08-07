@@ -246,16 +246,24 @@ export default function QuizForm({
   );
 
   const handleProctoringFault = useCallback(
-    (data: { warned: boolean; blocked: boolean; faultCount: number; tipo: "camara" | "ruido" }) => {
+    (data: {
+      warned: boolean;
+      blocked: boolean;
+      faultCount: number;
+      tipo: "camara" | "ruido";
+      descripcion?: string;
+    }) => {
+      const defaultDesc =
+        data.tipo === "ruido"
+          ? "Se detectó ruido excesivo sostenido por 3 segundos continuos (+15 dB sobre el nivel base)."
+          : "Se detectó una irregularidad visual en tu sesión.";
+
       if (data.blocked) {
         setActiveFaultWarning({
           isBlocking: true,
           tipo: data.tipo,
           faultCount: data.faultCount,
-          descripcion:
-            data.tipo === "ruido"
-              ? "Se detectó ruido excesivo sostenido en tu entorno."
-              : "Se detectó una irregularidad visual en tu sesión.",
+          descripcion: data.descripcion || defaultDesc,
         });
         mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
         cancelAnimationFrame(animationFrameRef.current ?? 0);
@@ -265,10 +273,7 @@ export default function QuizForm({
           isBlocking: false,
           tipo: data.tipo,
           faultCount: data.faultCount,
-          descripcion:
-            data.tipo === "ruido"
-              ? "Se detectó ruido excesivo sostenido en tu entorno."
-              : "Se detectó una irregularidad visual en tu sesión.",
+          descripcion: data.descripcion || defaultDesc,
         });
       }
     },
@@ -323,6 +328,7 @@ export default function QuizForm({
         warned?: boolean;
         blocked?: boolean;
         faultCount?: number;
+        descripcion?: string;
         estado?: string;
       };
 
@@ -332,6 +338,7 @@ export default function QuizForm({
           blocked: data.blocked ?? false,
           faultCount: data.faultCount ?? 0,
           tipo: "camara",
+          descripcion: data.descripcion,
         });
       }
     } catch (error) {
@@ -361,6 +368,7 @@ export default function QuizForm({
           warned?: boolean;
           blocked?: boolean;
           faultCount?: number;
+          descripcion?: string;
         };
 
         if (data.warned || data.blocked) {
@@ -369,6 +377,7 @@ export default function QuizForm({
             blocked: data.blocked ?? false,
             faultCount: data.faultCount ?? 0,
             tipo: "ruido",
+            descripcion: data.descripcion,
           });
         }
       } catch (error) {
@@ -1408,15 +1417,20 @@ function FaultWarningModal({
               : `Advertencia — Falta ${warning?.faultCount ?? 1} de 2`}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground pt-2 leading-relaxed space-y-3">
-            <span className="block">{warning?.descripcion}</span>
+            <div className="p-3 rounded-xl border border-border/60 bg-secondary/30 text-xs font-semibold text-foreground space-y-1 text-left">
+              <span className="text-[10px] text-muted-foreground uppercase font-bold block tracking-wider">
+                Motivo de la falta ({warning?.tipo === "ruido" ? "Audio / Micrófono" : "Cámara / Monitoreo Visual"})
+              </span>
+              <p className="text-sm font-medium text-foreground">{warning?.descripcion}</p>
+            </div>
             {isBlocking ? (
-              <span className="block font-semibold text-destructive">
+              <span className="block font-semibold text-destructive text-left">
                 Tu examen ha sido bloqueado. Actualmente tienes calificación
                 reprobatoria hasta que el profesor revise las evidencias y decida
                 si lo desbloquea.
               </span>
             ) : (
-              <span className="block font-semibold text-warning">
+              <span className="block font-semibold text-amber-500 text-left">
                 Esta es tu primera advertencia. Si acumulas una más, tu examen
                 será bloqueado para revisión del profesor.{" "}
                 <strong>El tiempo sigue corriendo.</strong>

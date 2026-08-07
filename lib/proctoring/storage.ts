@@ -27,7 +27,8 @@ type SaveNoiseInput = {
 // ─── Validación ───────────────────────────────────────────────────────────────
 
 export function assertValidSnapshot(bytes: Buffer, mimeType: string) {
-  if (!ALLOWED_SNAPSHOT_MIME_TYPES.includes(mimeType as never)) {
+  const cleanMime = mimeType.split(";")[0].trim().toLowerCase();
+  if (!ALLOWED_SNAPSHOT_MIME_TYPES.includes(cleanMime as never)) {
     throw new Error("Tipo de imagen no permitido");
   }
   if (bytes.byteLength === 0) {
@@ -39,7 +40,8 @@ export function assertValidSnapshot(bytes: Buffer, mimeType: string) {
 }
 
 export function assertValidNoise(bytes: Buffer, mimeType: string) {
-  if (!ALLOWED_NOISE_MIME_TYPES.includes(mimeType as never)) {
+  const cleanMime = mimeType.split(";")[0].trim().toLowerCase();
+  if (!ALLOWED_NOISE_MIME_TYPES.includes(cleanMime as never)) {
     throw new Error("Tipo de audio no permitido");
   }
   if (bytes.byteLength === 0) {
@@ -140,14 +142,16 @@ async function saveToStorage(relativePath: string, bytes: Buffer) {
 }
 
 function getExtensionForMimeType(mimeType: string) {
-  if (mimeType === "image/png") return "png";
-  if (mimeType === "image/webp") return "webp";
+  const cleanMime = mimeType.split(";")[0].trim().toLowerCase();
+  if (cleanMime === "image/png") return "png";
+  if (cleanMime === "image/webp") return "webp";
   return "jpg";
 }
 
 function getExtensionForAudioMimeType(mimeType: string) {
-  if (mimeType === "audio/ogg") return "ogg";
-  if (mimeType === "audio/wav") return "wav";
+  const cleanMime = mimeType.split(";")[0].trim().toLowerCase();
+  if (cleanMime === "audio/ogg") return "ogg";
+  if (cleanMime === "audio/wav") return "wav";
   return "webm";
 }
 
