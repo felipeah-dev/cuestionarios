@@ -1316,12 +1316,14 @@ export default function QuizForm({
                 </Button>
               ) : (
                 <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-                  <DialogTrigger>
-                    <Button variant="default" className="rounded-xl font-bold px-6 shadow-md shadow-primary/20 cursor-pointer text-xs h-10">
-                      Enviar Cuestionario
-                      <CheckCircle2 className="h-4 w-4 ml-1.5 shrink-0" />
-                    </Button>
-                  </DialogTrigger>
+                  <Button
+                    variant="default"
+                    className="rounded-xl font-bold px-6 shadow-md shadow-primary/20 cursor-pointer text-xs h-10"
+                    onClick={() => setShowConfirmDialog(true)}
+                  >
+                    Enviar Cuestionario
+                    <CheckCircle2 className="h-4 w-4 ml-1.5 shrink-0" />
+                  </Button>
                   <DialogContent className="rounded-2xl border-border/60 bg-card/95 backdrop-blur-xl max-w-md w-[95%]">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2 text-xl font-bold">
