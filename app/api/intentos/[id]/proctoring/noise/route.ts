@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
-import { processProctoringSnapshot } from "@/lib/proctoring/service";
+import { processProctoringNoise } from "@/lib/proctoring/noise-service";
 
 export const runtime = "nodejs";
 
@@ -17,22 +17,19 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
   const formData = await request.formData();
-  const snapshot = formData.get("snapshot");
+  const audio = formData.get("audio");
 
-  if (!(snapshot instanceof File)) {
-    return NextResponse.json(
-      { error: "Snapshot requerido" },
-      { status: 400 }
-    );
+  if (!(audio instanceof File)) {
+    return NextResponse.json({ error: "Audio requerido" }, { status: 400 });
   }
 
   try {
-    const bytes = Buffer.from(await snapshot.arrayBuffer());
-    const result = await processProctoringSnapshot({
+    const bytes = Buffer.from(await audio.arrayBuffer());
+    const result = await processProctoringNoise({
       intentoId: id,
       usuarioId: user.id,
       bytes,
-      mimeType: snapshot.type || "application/octet-stream",
+      mimeType: audio.type || "audio/webm",
     });
 
     revalidatePath("/admin/proctoring");
@@ -45,10 +42,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         error:
           error instanceof Error
             ? error.message
-            : "No se pudo procesar el snapshot",
+            : "No se pudo procesar el audio",
       },
       { status: 400 }
     );
   }
 }
-

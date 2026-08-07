@@ -6,6 +6,8 @@ export const ALLOWED_SNAPSHOT_MIME_TYPES = [
   "image/webp",
 ] as const;
 
+// ─── Cámara ───────────────────────────────────────────────────────────────────
+
 export function getProctoringCaptureMinSeconds() {
   return getEnvNumber("PROCTORING_CAPTURE_MIN_SECONDS", 45);
 }
@@ -22,6 +24,55 @@ export function getProctoringHighConfidenceThreshold() {
 export function getGeminiProctoringModel() {
   return process.env.GEMINI_PROCTORING_MODEL || "gemini-2.5-flash";
 }
+
+// ─── Sistema de faltas ────────────────────────────────────────────────────────
+
+/**
+ * Número de faltas acumuladas (cámara + ruido) antes de bloquear el examen.
+ * Al llegar a este límite el intento pasa a PAUSADO_REVISION_IA.
+ */
+export const MAX_FAULTS_BEFORE_BLOCK = 2;
+
+// ─── Detección de ruido ───────────────────────────────────────────────────────
+
+/**
+ * Margen en dB sobre el baseline calibrado que dispara la alerta de ruido.
+ * Basado en: ANSI S12.60 (≤35 dB(A) aceptable) vs ISO 9921 (~54 dB(A) conversación a 2m).
+ * Factor multiplicador lineal equivalente: 10^(15/20) ≈ 5.62
+ */
+export const NOISE_DB_OVER_BASELINE = 15;
+export const NOISE_RMS_MULTIPLIER = Math.pow(10, NOISE_DB_OVER_BASELINE / 20); // ≈ 5.62
+
+/** Milisegundos que el ruido debe sostenerse sobre el umbral para generar una falta. */
+export function getNoiseSustainedMs() {
+  return getEnvNumber("NOISE_SUSTAINED_MS", 3000);
+}
+
+/** Milisegundos de audio a grabar cuando se confirma una falta de ruido. */
+export function getNoiseRecordingMs() {
+  return getEnvNumber("NOISE_RECORDING_MS", 5000);
+}
+
+/** Milisegundos de cooldown entre alertas de ruido para evitar cascadas. */
+export function getNoiseCooldownMs() {
+  return getEnvNumber("NOISE_COOLDOWN_MS", 30000);
+}
+
+/** Milisegundos de calibración al inicio del examen (durante este tiempo no corre el timer). */
+export function getNoiseCalibrationMs() {
+  return getEnvNumber("NOISE_CALIBRATION_MS", 5000);
+}
+
+/** Tamaño máximo permitido para una grabación de audio de evidencia. */
+export const MAX_NOISE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+export const ALLOWED_NOISE_MIME_TYPES = [
+  "audio/webm",
+  "audio/ogg",
+  "audio/wav",
+] as const;
+
+// ─── Helpers privados ─────────────────────────────────────────────────────────
 
 function getEnvNumber(name: string, fallback: number) {
   const value = Number(process.env[name]);

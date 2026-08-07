@@ -43,6 +43,11 @@ enum EstadoRevisionProctoring {
   ERROR_IA
 }
 
+enum TipoEvidenciaProctoring {
+  SNAPSHOT_CAMARA
+  GRABACION_RUIDO
+}
+
 // ─────────────────────────────────────────
 // MODELOS
 // ─────────────────────────────────────────
@@ -177,6 +182,7 @@ model AlertaProctoring {
   estadoRevision EstadoRevisionProctoring @default(PENDIENTE)
   revisadoPorId  String?
   revisadoEn     DateTime?
+  tipoEvidencia  TipoEvidenciaProctoring  @default(SNAPSHOT_CAMARA)
   creadoEn       DateTime                 @default(now())
   actualizadoEn  DateTime                 @updatedAt
 
@@ -188,6 +194,7 @@ model AlertaProctoring {
   @@index([estudianteId])
   @@index([estadoRevision])
   @@index([nivelAlerta])
+  @@index([intentoId, nivelAlerta])
 }
 
 // Respuesta de un usuario a una pregunta dentro de un intento

@@ -1,6 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getProctoringHighConfidenceThreshold } from "@/lib/proctoring/config";
+import {
+  MAX_FAULTS_BEFORE_BLOCK,
+  getProctoringHighConfidenceThreshold,
+} from "@/lib/proctoring/config";
 import { analyzeProctoringSnapshot } from "@/lib/proctoring/gemini";
 import { mapAlertLevel } from "@/lib/proctoring/schema";
 import { saveProctoringSnapshot } from "@/lib/proctoring/storage";
@@ -10,6 +13,8 @@ import {
   isActiveAttemptStatus,
 } from "@/lib/quiz-rules";
 
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
 type ProcessSnapshotInput = {
   intentoId: string;
   usuarioId: string;
@@ -17,14 +22,32 @@ type ProcessSnapshotInput = {
   mimeType: string;
 };
 
+export type ProctoringFaultResult = {
+  ok: true;
+  warned: boolean;
+  blocked: boolean;
+  faultCount: number;
+  estado: string;
+  alert: {
+    id: string;
+    nivelAlerta: string;
+    confianza: number;
+    estadoRevision: string;
+  } | null;
+};
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
 const FALLBACK_MODEL = "gemini-unavailable";
+
+// ─── Servicio principal ───────────────────────────────────────────────────────
 
 export async function processProctoringSnapshot({
   intentoId,
   usuarioId,
   bytes,
   mimeType,
-}: ProcessSnapshotInput) {
+}: ProcessSnapshotInput): Promise<ProctoringFaultResult> {
   const intento = await prisma.intento.findFirst({
     where: { id: intentoId, usuarioId },
     select: {
@@ -35,11 +58,10 @@ export async function processProctoringSnapshot({
       reactivadoEn: true,
       tiempoRestanteSegundos: true,
       cuestionarioId: true,
+      usuario: { select: { nombre: true } },
       cuestionario: {
         select: {
-          preguntas: {
-            select: { tipo: true },
-          },
+          preguntas: { select: { tipo: true } },
         },
       },
     },
@@ -52,7 +74,9 @@ export async function processProctoringSnapshot({
   if (intento.estado === "PAUSADO_REVISION_IA") {
     return {
       ok: true,
-      paused: true,
+      warned: false,
+      blocked: true,
+      faultCount: MAX_FAULTS_BEFORE_BLOCK,
       estado: intento.estado,
       alert: null,
     };
@@ -62,7 +86,13 @@ export async function processProctoringSnapshot({
     throw new Error("El intento no esta activo");
   }
 
-  const snapshot = await saveProctoringSnapshot({ intentoId, bytes, mimeType });
+  const snapshot = await saveProctoringSnapshot({
+    intentoId,
+    nombreAlumno: intento.usuario.nombre,
+    bytes,
+    mimeType,
+  });
+
   const threshold = getProctoringHighConfidenceThreshold();
   const durationMinutes = getQuizEstimatedMinutes(intento.cuestionario.preguntas);
 
@@ -71,7 +101,7 @@ export async function processProctoringSnapshot({
   let nivelAlerta: "BAJO" | "MEDIO" | "ALTO" = "BAJO";
   let confianza = 0;
   let estadoRevision: "PENDIENTE" | "ERROR_IA" = "PENDIENTE";
-  let shouldPause = false;
+  let isHighAlert = false;
 
   try {
     const analysis = await analyzeProctoringSnapshot(bytes, mimeType);
@@ -79,10 +109,7 @@ export async function processProctoringSnapshot({
     aiResult = analysis.result;
     nivelAlerta = mapAlertLevel(analysis.result.nivel_alerta);
     confianza = analysis.result.confianza;
-    shouldPause =
-      nivelAlerta === "ALTO" &&
-      confianza >= threshold &&
-      analysis.result.requiere_revision_humana;
+    isHighAlert = nivelAlerta === "ALTO" && confianza >= threshold;
   } catch (error) {
     estadoRevision = "ERROR_IA";
     aiResult = {
@@ -92,7 +119,13 @@ export async function processProctoringSnapshot({
   }
 
   const now = new Date();
+
   const result = await prisma.$transaction(async (tx) => {
+    // Contar faltas ALTO existentes antes de crear la nueva para decidir la acción
+    const existingFaultCount = await tx.alertaProctoring.count({
+      where: { intentoId, nivelAlerta: "ALTO" },
+    });
+
     const alert = await tx.alertaProctoring.create({
       data: {
         intentoId,
@@ -103,6 +136,7 @@ export async function processProctoringSnapshot({
         nivelAlerta,
         confianza,
         estadoRevision,
+        tipoEvidencia: "SNAPSHOT_CAMARA",
       },
       select: {
         id: true,
@@ -112,13 +146,19 @@ export async function processProctoringSnapshot({
       },
     });
 
-    if (shouldPause) {
+    if (!isHighAlert) {
+      return { alert, newFaultCount: existingFaultCount, shouldBlock: false };
+    }
+
+    const newFaultCount = existingFaultCount + 1;
+    const shouldBlock = newFaultCount >= MAX_FAULTS_BEFORE_BLOCK;
+
+    if (shouldBlock) {
       const remainingSeconds = getActiveAttemptRemainingSeconds(
         intento,
         durationMinutes,
         now
       );
-
       await tx.intento.update({
         where: { id: intentoId },
         data: {
@@ -129,13 +169,19 @@ export async function processProctoringSnapshot({
       });
     }
 
-    return alert;
+    return { alert, newFaultCount, shouldBlock };
   });
+
+  const blocked = result.shouldBlock;
+  const warned = isHighAlert && !blocked;
 
   return {
     ok: true,
-    paused: shouldPause,
-    estado: shouldPause ? "PAUSADO_REVISION_IA" : intento.estado,
-    alert: result,
+    warned,
+    blocked,
+    faultCount: result.newFaultCount,
+    estado: blocked ? "PAUSADO_REVISION_IA" : intento.estado,
+    alert: result.alert,
   };
 }
+
