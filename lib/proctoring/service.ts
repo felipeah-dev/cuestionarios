@@ -148,6 +148,10 @@ export async function processProctoringSnapshot({
       where: faultWhere,
     });
 
+    if (!isHighAlert) {
+      return { alert: null, newFaultCount: existingFaultCount, shouldBlock: false };
+    }
+
     const alert = await tx.alertaProctoring.create({
       data: {
         intentoId,
@@ -155,7 +159,7 @@ export async function processProctoringSnapshot({
         snapshotPath: snapshot.relativePath,
         modelUsed,
         aiResultJson: aiResult,
-        nivelAlerta,
+        nivelAlerta: "ALTO",
         confianza,
         estadoRevision,
         tipoEvidencia: "SNAPSHOT_CAMARA",
@@ -167,10 +171,6 @@ export async function processProctoringSnapshot({
         estadoRevision: true,
       },
     });
-
-    if (!isHighAlert) {
-      return { alert, newFaultCount: existingFaultCount, shouldBlock: false };
-    }
 
     const newFaultCount = existingFaultCount + 1;
     const shouldBlock = newFaultCount >= MAX_FAULTS_BEFORE_BLOCK;

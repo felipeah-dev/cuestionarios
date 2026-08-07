@@ -69,11 +69,15 @@ export async function processProctoringNoise({
     mimeType,
   });
 
+  const DEFAULT_NOISE_DESCRIPTION =
+    "Se detectó ruido excesivo o habla continua en el micrófono (+15 dB sobre el nivel base de silencio).";
+
   const aiResultJson: Prisma.InputJsonValue = {
     detection_method: "web_audio_api_rms",
     noise_above_baseline: true,
     sustained_seconds: 3,
     agc_disabled: true,
+    descripcion_breve: DEFAULT_NOISE_DESCRIPTION,
   };
 
   const result = await prisma.$transaction(async (tx) => {

@@ -4,33 +4,38 @@ import { useTransition } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  anularAlertaProctoringAction,
-  confirmarAlertaProctoringAction,
+  confirmarIntentoIrregularidadAction,
+  reactivarIntentoFalsoPositivoAction,
 } from "../_actions";
 
 type ProctoringReviewActionsProps = {
-  alertId: string;
+  intentoId: string;
+  estadoIntento?: string;
   disabled?: boolean;
 };
 
 export function ProctoringReviewActions({
-  alertId,
+  intentoId,
+  estadoIntento,
   disabled,
 }: ProctoringReviewActionsProps) {
   const [isPending, startTransition] = useTransition();
   const isDisabled = disabled || isPending;
 
+  const isCancelled = estadoIntento === "CANCELADO_CONFIRMADO";
+  const isReactivated = estadoIntento === "REACTIVADO_POR_ADMIN";
+
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-3">
       <Button
         type="button"
         variant="destructive"
-        size="sm"
-        className="rounded-xl font-bold"
-        disabled={isDisabled}
+        size="default"
+        className="rounded-xl font-bold gap-2 shadow-md shadow-destructive/10 cursor-pointer"
+        disabled={isDisabled || isCancelled}
         onClick={() =>
           startTransition(async () => {
-            await confirmarAlertaProctoringAction(alertId);
+            await confirmarIntentoIrregularidadAction(intentoId);
           })
         }
       >
@@ -39,17 +44,18 @@ export function ProctoringReviewActions({
         ) : (
           <XCircle className="h-4 w-4" />
         )}
-        Confirmar trampa
+        {isCancelled ? "Trampa Confirmada " : "Confirmar Trampa "}
       </Button>
+
       <Button
         type="button"
         variant="outline"
-        size="sm"
-        className="rounded-xl border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 font-bold"
-        disabled={isDisabled}
+        size="default"
+        className="rounded-xl border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10 font-bold gap-2 shadow-sm cursor-pointer"
+        disabled={isDisabled || isReactivated}
         onClick={() =>
           startTransition(async () => {
-            await anularAlertaProctoringAction(alertId);
+            await reactivarIntentoFalsoPositivoAction(intentoId);
           })
         }
       >
@@ -58,7 +64,7 @@ export function ProctoringReviewActions({
         ) : (
           <CheckCircle2 className="h-4 w-4" />
         )}
-        Anular / habilitar examen
+        {isReactivated ? "Examen Reactivado" : "Reactivar Examen"}
       </Button>
     </div>
   );

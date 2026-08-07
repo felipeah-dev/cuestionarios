@@ -1,186 +1,185 @@
 import { redirect } from "next/navigation";
-import { AlertTriangle, ShieldAlert, UserCheck } from "lucide-react";
-import type { Prisma } from "@prisma/client";
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ProctoringReviewActions } from "./_components/ProctoringReviewActions";
-import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  ShieldAlert,
+  FileText,
+  Users,
+  ChevronRight,
+  AlertTriangle,
+  GraduationCap,
+  Clock,
+  CheckCircle2,
+} from "lucide-react";
 
 export const metadata = {
-  title: "Alertas de Proctoring",
+  title: "Supervisión de Cuestionarios — Proctoring IA",
 };
-
-const alertLevelConfig = {
-  BAJO: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
-  MEDIO: "border-warning/30 bg-warning/10 text-warning",
-  ALTO: "border-destructive/30 bg-destructive/10 text-destructive",
-} as const;
-
-const reviewStatusConfig = {
-  PENDIENTE: "border-warning/30 bg-warning/10 text-warning",
-  CONFIRMADA: "border-destructive/30 bg-destructive/10 text-destructive",
-  ANULADA_FALSO_POSITIVO:
-    "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
-  ERROR_IA: "border-border bg-muted text-muted-foreground",
-} as const;
 
 export default async function AdminProctoringPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.rol !== "ADMIN") redirect("/usuario/dashboard");
 
-  const alerts = await prisma.alertaProctoring.findMany({
+  // Obtener cuestionarios del profesor que tienen actividad de supervisión (intentos o alertas)
+  const cuestionarios = await prisma.cuestionario.findMany({
     where: {
-      intento: {
-        cuestionario: {
-          adminId: user.id,
+      adminId: user.id,
+      intentos: {
+        some: {
+          OR: [
+            { estado: "PAUSADO_REVISION_IA" },
+            { estado: "CANCELADO_CONFIRMADO" },
+            { estado: "REACTIVADO_POR_ADMIN" },
+            { alertasProctoring: { some: {} } },
+          ],
+        },
+      },
+    },
+    select: {
+      id: true,
+      titulo: true,
+      descripcion: true,
+      grupo: {
+        select: {
+          nombre: true,
+          codigo: true,
+        },
+      },
+      intentos: {
+        where: {
+          OR: [
+            { estado: "PAUSADO_REVISION_IA" },
+            { estado: "CANCELADO_CONFIRMADO" },
+            { estado: "REACTIVADO_POR_ADMIN" },
+            { alertasProctoring: { some: {} } },
+          ],
+        },
+        select: {
+          id: true,
+          usuarioId: true,
+          estado: true,
+          alertasProctoring: {
+            select: {
+              id: true,
+              estadoRevision: true,
+              nivelAlerta: true,
+            },
+          },
         },
       },
     },
     orderBy: { creadoEn: "desc" },
-    take: 50,
-    include: {
-      estudiante: { select: { nombre: true, email: true } },
-      revisadoPor: { select: { nombre: true } },
-      intento: {
-        select: {
-          id: true,
-          estado: true,
-          cuestionario: { select: { titulo: true } },
-        },
-      },
-    },
   });
 
-  const pendingCount = alerts.filter((alert) => alert.estadoRevision === "PENDIENTE").length;
-
   return (
-    <div className="space-y-7">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="space-y-8">
+      {/* Header Banner */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between border-b border-border/40 pb-6">
         <div>
-          <Badge className="mb-3 border border-primary/20 bg-primary/10 text-primary">
-            Proctoring IA
+          <Badge className="mb-3 border border-primary/20 bg-primary/10 text-primary font-semibold">
+            Supervisión IA (Proctoring)
           </Badge>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            Alertas de supervision
+            Cuestionarios con Supervisión
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Revisa evidencia generada por IA y decide si se confirma una
-            irregularidad o si fue un falso positivo.
+            Selecciona un cuestionario para revisar las incidencias detectadas y gestionar las revisiones de los alumnos.
           </p>
-        </div>
-        <div className="rounded-2xl border border-border/60 bg-card/60 px-4 py-3 text-sm">
-          <span className="font-bold text-foreground">{pendingCount}</span>{" "}
-          <span className="text-muted-foreground">pendientes</span>
         </div>
       </div>
 
-      {alerts.length === 0 ? (
+      {cuestionarios.length === 0 ? (
         <Card className="border border-dashed border-border/70 bg-card/40">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <ShieldAlert className="mb-4 h-12 w-12 text-muted-foreground" />
+            <ShieldAlert className="mb-4 h-12 w-12 text-muted-foreground/60" />
             <h2 className="text-lg font-bold text-foreground">
-              Sin alertas de proctoring
+              Sin incidencias de supervisión
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Cuando Gemini detecte una posible irregularidad, aparecera aqui.
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              Cuando los alumnos realicen cuestionarios y Gemini o el detector de ruido registren incidencias, tus cuestionarios aparecerán aquí organizados.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-5">
-          {alerts.map((alert) => {
-            const description = getAiDescription(alert.aiResultJson);
-            const isPending = alert.estadoRevision === "PENDIENTE";
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {cuestionarios.map((c) => {
+            // Métricas por cuestionario
+            const estudiantesUnicos = new Set(c.intentos.map((i) => i.usuarioId)).size;
+            const pendientesCount = c.intentos.flatMap((i) => i.alertasProctoring).filter((a) => a.estadoRevision === "PENDIENTE").length;
+            const pausadosCount = c.intentos.filter((i) => i.estado === "PAUSADO_REVISION_IA").length;
 
             return (
               <Card
-                key={alert.id}
-                className="overflow-hidden border border-border/60 bg-card/70 shadow-sm"
+                key={c.id}
+                className="relative flex flex-col justify-between border border-border/60 hover:border-primary/40 hover:shadow-lg transition-all duration-300 bg-card/60 backdrop-blur-xl group overflow-hidden"
               >
-                <CardHeader className="border-b border-border/40">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "border font-bold",
-                            alertLevelConfig[alert.nivelAlerta]
-                          )}
-                        >
-                          {alert.nivelAlerta}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "border font-bold",
-                            reviewStatusConfig[alert.estadoRevision]
-                          )}
-                        >
-                          {alert.estadoRevision.replaceAll("_", " ")}
-                        </Badge>
-                        <span className="text-xs font-semibold text-muted-foreground">
-                          Confianza {(alert.confianza * 100).toFixed(0)}%
-                        </span>
-                      </div>
-                      <CardTitle className="mt-3 text-xl font-bold text-foreground">
-                        {alert.intento.cuestionario.titulo}
-                      </CardTitle>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {alert.estudiante.nombre} - {alert.estudiante.email}
-                      </p>
-                    </div>
+                <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-primary/30 to-primary/0 group-hover:from-primary group-hover:to-amber-500 transition-all duration-500" />
 
-                    {isPending ? (
-                      <ProctoringReviewActions alertId={alert.id} />
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <Badge variant="outline" className="bg-secondary/60 text-muted-foreground border-border/60 text-[11px] font-bold">
+                      <GraduationCap className="h-3 w-3 mr-1 text-primary" />
+                      {c.grupo?.nombre ?? "Sin Materia"}
+                    </Badge>
+                    {pausadosCount > 0 ? (
+                      <Badge className="bg-destructive/10 text-destructive border-destructive/20 font-bold text-[11px] py-0.5 px-2">
+                        <AlertTriangle className="h-3 w-3 mr-1 text-destructive" />
+                        {pausadosCount} Pausado{pausadosCount > 1 ? "s" : ""}
+                      </Badge>
+                    ) : pendientesCount > 0 ? (
+                      <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-bold text-[11px] py-0.5 px-2">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {pendientesCount} Pendiente{pendientesCount > 1 ? "s" : ""}
+                      </Badge>
                     ) : (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <UserCheck className="h-4 w-4" />
-                        Revisado por {alert.revisadoPor?.nombre ?? "admin"}
-                      </div>
+                      <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold text-[11px] py-0.5 px-2">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Revisado
+                      </Badge>
                     )}
                   </div>
+                  <CardTitle className="text-lg font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                    {c.titulo}
+                  </CardTitle>
+                  {c.descripcion && (
+                    <CardDescription className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                      {c.descripcion}
+                    </CardDescription>
+                  )}
                 </CardHeader>
-                <CardContent className="grid gap-5 p-5 lg:grid-cols-[320px_1fr]">
-                  <div className="overflow-hidden rounded-xl border border-border/60 bg-background/60">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`/api/proctoring/evidence/${alert.id}`}
-                      alt="Evidencia de proctoring"
-                      className="aspect-video w-full object-cover"
-                    />
-                  </div>
-                  <div className="space-y-4">
+
+                <CardContent className="space-y-5 flex-1 flex flex-col justify-between pt-2">
+                  <div className="grid grid-cols-2 gap-3 py-3 px-4 rounded-xl bg-secondary/40 border border-border/40 text-xs">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                        Descripcion IA
-                      </p>
-                      <p className="mt-1 rounded-xl border border-border/50 bg-background/50 p-4 text-sm leading-6 text-foreground">
-                        {description}
-                      </p>
+                      <span className="text-muted-foreground block mb-0.5">Alumnos con Incidencias</span>
+                      <span className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5 text-primary" />
+                        {estudiantesUnicos} {estudiantesUnicos === 1 ? "alumno" : "alumnos"}
+                      </span>
                     </div>
-                    <div className="grid gap-3 text-sm sm:grid-cols-2">
-                      <Info label="Intento" value={alert.intento.id} />
-                      <Info label="Estado intento" value={alert.intento.estado} />
-                      <Info
-                        label="Fecha alerta"
-                        value={new Date(alert.creadoEn).toLocaleString("es-MX", {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        })}
-                      />
-                      <Info label="Modelo" value={alert.modelUsed} />
+                    <div>
+                      <span className="text-muted-foreground block mb-0.5">Revisiones Pendientes</span>
+                      <span className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                        <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
+                        {pendientesCount} {pendientesCount === 1 ? "alerta" : "alertas"}
+                      </span>
                     </div>
-                    {alert.estadoRevision === "ERROR_IA" && (
-                      <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                        Gemini no devolvio una respuesta valida. No se pauso el
-                        examen automaticamente por esta alerta tecnica.
-                      </div>
-                    )}
+                  </div>
+
+                  <div className="mt-auto">
+                    <Button
+                      render={<Link href={`/admin/proctoring/${c.id}`} />}
+                      nativeButton={false}
+                      className="w-full group shadow-md shadow-primary/10 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 font-bold"
+                    >
+                      Ver Alumnos con Incidencias
+                      <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -190,28 +189,4 @@ export default async function AdminProctoringPage() {
       )}
     </div>
   );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border/50 bg-background/40 p-3">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 break-all text-sm font-semibold text-foreground">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function getAiDescription(value: Prisma.JsonValue) {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    const description = value.descripcion_breve;
-    if (typeof description === "string") return description;
-    const message = value.message;
-    if (typeof message === "string") return message;
-  }
-
-  return "Sin descripcion disponible.";
 }

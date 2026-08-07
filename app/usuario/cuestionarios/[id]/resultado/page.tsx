@@ -64,11 +64,11 @@ export default async function ResultadoCuestionarioPage({ params }: Props) {
   const statusDateLabel = esCancelado ? "Cancelado el" : "Enviado el";
   const formattedStatusDate = statusDate
     ? new Date(statusDate).toLocaleString("es-ES", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
     : "Fecha no disponible";
 
   // Visual status indicators
@@ -105,7 +105,7 @@ export default async function ResultadoCuestionarioPage({ params }: Props) {
             </h1>
             <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
               {esCancelado
-                ? "Este intento fue cancelado despues de una revision humana de proctoring."
+                ? "Tu examen ha sido cancelado debido a que el profesor detectó que cometiste irregularidades durante la sesión. Para mayor información, acércate al profesor."
                 : esCalificado
                   ? feedbackMessage
                   : "Tus respuestas han sido enviadas. Al contener preguntas abiertas, la calificación final se actualizará una vez que el docente las evalúe manualmente."}
