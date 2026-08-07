@@ -37,11 +37,16 @@ export const MAX_FAULTS_BEFORE_BLOCK = 2;
 
 /**
  * Margen en dB sobre el baseline calibrado que dispara la alerta de ruido.
- * Basado en: ANSI S12.60 (≤35 dB(A) aceptable) vs ISO 9921 (~54 dB(A) conversación a 2m).
- * Factor multiplicador lineal equivalente: 10^(15/20) ≈ 5.62
+ * 22 dB (~12.59x) evita falsos positivos por tecleo de laptop, clics de mouse o respiración.
  */
-export const NOISE_DB_OVER_BASELINE = 15;
-export const NOISE_RMS_MULTIPLIER = Math.pow(10, NOISE_DB_OVER_BASELINE / 20); // ≈ 5.62
+export const NOISE_DB_OVER_BASELINE = 22;
+export const NOISE_RMS_MULTIPLIER = Math.pow(10, NOISE_DB_OVER_BASELINE / 20); // ≈ 12.59
+
+/**
+ * Piso mínimo absoluto de RMS (0.055).
+ * Cualquier sonido por debajo de este nivel (como tecleo o ruidos mecánicos) es ignorado.
+ */
+export const MIN_NOISE_RMS_FLOOR = 0.055;
 
 /** Milisegundos que el ruido debe sostenerse sobre el umbral para generar una falta. */
 export function getNoiseSustainedMs() {
@@ -55,7 +60,7 @@ export function getNoiseRecordingMs() {
 
 /** Milisegundos de cooldown entre alertas de ruido para evitar cascadas. */
 export function getNoiseCooldownMs() {
-  return getEnvNumber("NOISE_COOLDOWN_MS", 30000);
+  return getEnvNumber("NOISE_COOLDOWN_MS", 5000);
 }
 
 /** Milisegundos de calibración al inicio del examen (durante este tiempo no corre el timer). */

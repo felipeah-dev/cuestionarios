@@ -166,6 +166,13 @@ export default async function AdminProctoringCuestionarioPage({ params }: Props)
                   Reactivado por Profesor
                 </Badge>
               );
+            } else if (intento.estado === "ENVIADO" || intento.estado === "CALIFICADO") {
+              estadoBadge = (
+                <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold">
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                  Examen Entregado (Con Advertencia)
+                </Badge>
+              );
             }
 
             return (

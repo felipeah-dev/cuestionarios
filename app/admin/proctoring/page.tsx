@@ -82,7 +82,7 @@ export default async function AdminProctoringPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between border-b border-border/40 pb-6">
         <div>
           <Badge className="mb-3 border border-primary/20 bg-primary/10 text-primary font-semibold">
-            Supervisión IA (Proctoring)
+            Supervisión
           </Badge>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
             Cuestionarios con Supervisión
@@ -110,6 +110,7 @@ export default async function AdminProctoringPage() {
           {cuestionarios.map((c) => {
             // Métricas por cuestionario
             const estudiantesUnicos = new Set(c.intentos.map((i) => i.usuarioId)).size;
+            const totalAlertas = c.intentos.flatMap((i) => i.alertasProctoring).length;
             const pendientesCount = c.intentos.flatMap((i) => i.alertasProctoring).filter((a) => a.estadoRevision === "PENDIENTE").length;
             const pausadosCount = c.intentos.filter((i) => i.estado === "PAUSADO_REVISION_IA").length;
 
@@ -163,10 +164,14 @@ export default async function AdminProctoringPage() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block mb-0.5">Revisiones Pendientes</span>
+                      <span className="text-muted-foreground block mb-0.5">
+                        {pendientesCount > 0 ? "Por Revisar" : "Total Incidencias"}
+                      </span>
                       <span className="font-bold text-sm text-foreground flex items-center gap-1.5">
-                        <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
-                        {pendientesCount} {pendientesCount === 1 ? "alerta" : "alertas"}
+                        <ShieldAlert className={`h-3.5 w-3.5 ${pendientesCount > 0 ? "text-amber-500" : "text-primary"}`} />
+                        {pendientesCount > 0
+                          ? `${pendientesCount} pendiente${pendientesCount > 1 ? "s" : ""}`
+                          : `${totalAlertas} registrada${totalAlertas !== 1 ? "s" : ""}`}
                       </span>
                     </div>
                   </div>

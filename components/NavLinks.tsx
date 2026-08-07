@@ -16,7 +16,7 @@ const adminItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/grupos", label: "Grupos", icon: GraduationCap },
   { href: "/admin/cuestionarios", label: "Cuestionarios", icon: ClipboardList },
-  { href: "/admin/proctoring", label: "Proctoring", icon: ShieldAlert },
+  { href: "/admin/proctoring", label: "Supervisión", icon: ShieldAlert },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
   { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },
 ];

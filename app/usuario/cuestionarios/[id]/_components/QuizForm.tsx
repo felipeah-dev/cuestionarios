@@ -105,16 +105,16 @@ type MediaStatus =
   | "denied"
   | "unsupported";
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-/** Factor multiplicador para el umbral de ruido: +15 dB sobre el baseline (10^(15/20) ≈ 5.62) */
-const NOISE_RMS_MULTIPLIER = 5.62;
+/** Factor multiplicador para el umbral de ruido: +22 dB sobre el baseline (10^(22/20) ≈ 12.59) */
+const NOISE_RMS_MULTIPLIER = 12.59;
+/** Piso mínimo absoluto de RMS (0.08) para ignorar el tecleo de laptop/teclado mecánico y ruidos de escritorio */
+const MIN_NOISE_RMS_FLOOR = 0.08;
 /** Milisegundos sostenidos de ruido para disparar una falta */
 const NOISE_SUSTAINED_MS = 3000;
 /** Milisegundos de audio a grabar como evidencia */
 const NOISE_RECORDING_MS = 5000;
 /** Cooldown entre alertas de ruido */
-const NOISE_COOLDOWN_MS = 30000;
+const NOISE_COOLDOWN_MS = 5000;
 /** Duración de la calibración inicial */
 const NOISE_CALIBRATION_MS = 5000;
 /** Tamaño del buffer del analizador FFT */
@@ -197,7 +197,28 @@ export default function QuizForm({
   });
 
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(() => {
+    if (!intento || intento.respuestas.length === 0) return 0;
+
+    const contestadasSet = new Set(
+      intento.respuestas
+        .filter(
+          (r) =>
+            r.opcionId !== null ||
+            (r.respuestaAbierta !== null && r.respuestaAbierta.trim() !== "")
+        )
+        .map((r) => r.preguntaId)
+    );
+
+    const primerSinResponderIndex = preguntas.findIndex(
+      (p) => !contestadasSet.has(p.id)
+    );
+    if (primerSinResponderIndex !== -1) {
+      return primerSinResponderIndex;
+    }
+
+    return Math.max(0, preguntas.length - 1);
+  });
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isSubmitting, startSubmitTransition] = useTransition();
 
@@ -400,13 +421,13 @@ export default function QuizForm({
     setMediaStatus("checking");
 
     try {
-      // Desactivar AGC para preservar la señal real — necesario para la calibración
+      // Habilitar supresión de ruido nativa del navegador para filtrar clics de teclado
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: {
-          autoGainControl: false,
-          noiseSuppression: false,
-          echoCancellation: false,
+          autoGainControl: true,
+          noiseSuppression: true,
+          echoCancellation: true,
         },
       });
       mediaStreamRef.current = stream;
@@ -757,8 +778,9 @@ export default function QuizForm({
       const rms = calcRms(buffer);
       setNoiseLevelRms(rms);
 
-      const threshold = noiseBaselineRef.current * NOISE_RMS_MULTIPLIER;
-      const isAbove = rms > threshold && threshold > 0;
+      const rawThreshold = noiseBaselineRef.current * NOISE_RMS_MULTIPLIER;
+      const threshold = Math.max(rawThreshold, MIN_NOISE_RMS_FLOOR);
+      const isAbove = rms > threshold;
       setNoiseIsAboveThreshold(isAbove);
 
       if (isAbove && !noiseCooldownRef.current) {
@@ -869,15 +891,17 @@ export default function QuizForm({
     setSavingMap((prev) => ({ ...prev, [preguntaId]: true }));
 
     try {
-      await saveAnswerAction(activeAttempt.id, preguntaId, {
+      const res = await saveAnswerAction(activeAttempt.id, preguntaId, {
         opcionId: data.opcionId,
         respuestaAbierta: data.respuestaAbierta,
       });
-      if (data.respuestaAbierta !== undefined) {
-        lastSavedRef.current[preguntaId] = data.respuestaAbierta ?? "";
+      if (res && res.ok !== false) {
+        if (data.respuestaAbierta !== undefined) {
+          lastSavedRef.current[preguntaId] = data.respuestaAbierta ?? "";
+        }
       }
     } catch (error) {
-      console.error("Error al autoguardar respuesta:", error);
+      console.warn("No se pudo guardar la respuesta (intento no activo):", error);
     } finally {
       setSavingMap((prev) => ({ ...prev, [preguntaId]: false }));
     }

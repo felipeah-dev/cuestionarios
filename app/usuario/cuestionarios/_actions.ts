@@ -45,7 +45,7 @@ export async function saveAnswerAction(
   });
 
   if (!intento) {
-    throw new Error("Intento no encontrado o ya finalizado");
+    return { ok: false, error: "Intento no encontrado o ya finalizado" };
   }
 
   const remainingSeconds = getActiveAttemptRemainingSeconds(
@@ -62,7 +62,7 @@ export async function saveAnswerAction(
     revalidatePath("/usuario/cuestionarios");
     revalidatePath(`/usuario/cuestionarios/${intento.cuestionarioId}/resultado`);
 
-    throw new Error("El tiempo del examen ya termino");
+    return { ok: false, error: "El tiempo del examen ya terminó" };
   }
 
   await prisma.respuesta.upsert({
@@ -84,7 +84,7 @@ export async function saveAnswerAction(
     },
   });
 
-  return { success: true };
+  return { ok: true, success: true };
 }
 
 export async function startQuizAttemptAction(cuestionarioId: string) {
