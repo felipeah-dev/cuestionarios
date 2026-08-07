@@ -36,17 +36,16 @@ export const MAX_FAULTS_BEFORE_BLOCK = 2;
 // ─── Detección de ruido ───────────────────────────────────────────────────────
 
 /**
- * Margen en dB sobre el baseline calibrado que dispara la alerta de ruido.
- * 22 dB (~12.59x) evita falsos positivos por tecleo de laptop, clics de mouse o respiración.
+ * Margen en dB sobre el baseline calibrado que dispara la alerta de ruido (+6 dB ≈ 2.0x).
+ * En combinación con el filtro pasa-banda vocal (300Hz-3400Hz), detecta susurros y murmullo.
  */
-export const NOISE_DB_OVER_BASELINE = 22;
-export const NOISE_RMS_MULTIPLIER = Math.pow(10, NOISE_DB_OVER_BASELINE / 20); // ≈ 12.59
+export const NOISE_DB_OVER_BASELINE = 6;
+export const NOISE_RMS_MULTIPLIER = Math.pow(10, NOISE_DB_OVER_BASELINE / 20); // ≈ 2.0x
 
 /**
- * Piso mínimo absoluto de RMS (0.055).
- * Cualquier sonido por debajo de este nivel (como tecleo o ruidos mecánicos) es ignorado.
+ * Piso mínimo absoluto de RMS (0.012) para capturar voz susurrada y murmullo.
  */
-export const MIN_NOISE_RMS_FLOOR = 0.055;
+export const MIN_NOISE_RMS_FLOOR = 0.012;
 
 /** Milisegundos que el ruido debe sostenerse sobre el umbral para generar una falta. */
 export function getNoiseSustainedMs() {

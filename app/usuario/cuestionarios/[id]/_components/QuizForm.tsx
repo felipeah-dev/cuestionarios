@@ -105,10 +105,10 @@ type MediaStatus =
   | "denied"
   | "unsupported";
 
-/** Factor multiplicador para el umbral de ruido: +22 dB sobre el baseline (10^(22/20) ≈ 12.59) */
-const NOISE_RMS_MULTIPLIER = 12.59;
-/** Piso mínimo absoluto de RMS (0.08) para ignorar el tecleo de laptop/teclado mecánico y ruidos de escritorio */
-const MIN_NOISE_RMS_FLOOR = 0.08;
+/** Factor multiplicador para el umbral de ruido: +6 dB sobre el baseline (10^(6/20) ≈ 2.0) */
+const NOISE_RMS_MULTIPLIER = 2.0;
+/** Piso mínimo absoluto de RMS (0.012) para capturar susurros y murmullo */
+const MIN_NOISE_RMS_FLOOR = 0.012;
 /** Milisegundos sostenidos de ruido para disparar una falta */
 const NOISE_SUSTAINED_MS = 3000;
 /** Milisegundos de audio a grabar como evidencia */
@@ -439,9 +439,18 @@ export default function QuizForm({
       const audioCtx = new AudioContext();
       audioContextRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
+
+      // Filtro pasa-banda vocal (300 Hz a 3400 Hz) para aislar la voz humana y descartar tecleos
+      const bandpass = audioCtx.createBiquadFilter();
+      bandpass.type = "bandpass";
+      bandpass.frequency.value = 1850; // Frecuencia central de formantes vocales
+      bandpass.Q.value = 0.75; // Ancho de banda espectral vocal
+
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = ANALYSER_FFT_SIZE;
-      source.connect(analyser);
+
+      source.connect(bandpass);
+      bandpass.connect(analyser);
       analyserRef.current = analyser;
 
       const buffer = new Float32Array(analyser.fftSize);
