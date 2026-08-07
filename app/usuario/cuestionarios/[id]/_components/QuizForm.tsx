@@ -1416,13 +1416,15 @@ function FaultWarningModal({
               ? "Examen bloqueado — Falta 2 de 2"
               : `Advertencia — Falta ${warning?.faultCount ?? 1} de 2`}
           </DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground pt-2 leading-relaxed space-y-3">
-            <div className="p-3 rounded-xl border border-border/60 bg-secondary/30 text-xs font-semibold text-foreground space-y-1 text-left">
+          <DialogDescription render={<div />} className="text-sm text-muted-foreground pt-2 leading-relaxed space-y-3">
+            <span className="block p-3 rounded-xl border border-border/60 bg-secondary/30 text-xs font-semibold text-foreground space-y-1 text-left">
               <span className="text-[10px] text-muted-foreground uppercase font-bold block tracking-wider">
-                Motivo de la falta ({warning?.tipo === "ruido" ? "Audio / Micrófono" : "Cámara / Monitoreo Visual"})
+                {isBlocking
+                  ? `Motivo de la 2ª incidencia — Provocó el bloqueo (${warning?.tipo === "ruido" ? "Audio / Micrófono" : "Cámara / Monitoreo Visual"})`
+                  : `Motivo de la 1ª falta (${warning?.tipo === "ruido" ? "Audio / Micrófono" : "Cámara / Monitoreo Visual"})`}
               </span>
-              <p className="text-sm font-medium text-foreground">{warning?.descripcion}</p>
-            </div>
+              <span className="block text-sm font-medium text-foreground">{warning?.descripcion}</span>
+            </span>
             {isBlocking ? (
               <span className="block font-semibold text-destructive text-left">
                 Tu examen ha sido bloqueado. Actualmente tienes calificación

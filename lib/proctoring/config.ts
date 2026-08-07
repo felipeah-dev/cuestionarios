@@ -9,12 +9,12 @@ export const ALLOWED_SNAPSHOT_MIME_TYPES = [
 // ─── Cámara ───────────────────────────────────────────────────────────────────
 
 export function getProctoringCaptureMinSeconds() {
-  return getEnvNumber("PROCTORING_CAPTURE_MIN_SECONDS", 15);
+  return getEnvNumber("PROCTORING_CAPTURE_MIN_SECONDS", 45);
 }
 
 export function getProctoringCaptureMaxSeconds() {
   const min = getProctoringCaptureMinSeconds();
-  return Math.max(min, getEnvNumber("PROCTORING_CAPTURE_MAX_SECONDS", 30));
+  return Math.max(min, getEnvNumber("PROCTORING_CAPTURE_MAX_SECONDS", 70));
 }
 
 export function getProctoringHighConfidenceThreshold() {
