@@ -199,13 +199,26 @@ export async function processProctoringSnapshot({
   if (result.alert) {
     const alertId = result.alert.id;
     const now = new Date();
+
+    // Determinar el número de intento correlativo del alumno en este cuestionario
+    const attemptCount = await prisma.intento.count({
+      where: {
+        usuarioId: intento.usuarioId,
+        cuestionarioId: intento.cuestionarioId,
+        creadoEn: { lte: intento.creadoEn },
+      },
+    });
+
+    const isReactivated = Boolean(intento.reactivadoEn && now >= intento.reactivadoEn);
+
     void uploadEvidenceBufferToDrive({
       fileBuffer: bytes,
       fileName: `foto-${now.toISOString().replace(/[:.]/g, "-")}.jpg`,
       mimeType: "image/jpeg",
       cuestionarioTitulo: intento.cuestionario.titulo,
       nombreAlumno: intento.usuario.nombre,
-      intentoId,
+      intentoNumero: attemptCount,
+      isReactivated,
     }).then(async (driveResult) => {
       if (driveResult) {
         await prisma.alertaProctoring.update({

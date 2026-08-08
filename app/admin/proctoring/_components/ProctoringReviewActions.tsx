@@ -45,7 +45,7 @@ export function ProctoringReviewActions({
         ) : (
           <XCircle className="h-4 w-4" />
         )}
-        {isCancelled ? "Trampa Confirmada (Cancelado)" : "Confirmar Trampa (Cancelar Examen)"}
+        {isCancelled ? "Trampa Confirmada" : "Confirmar Trampa"}
       </Button>
 
       {!isCompleted && (
@@ -66,7 +66,7 @@ export function ProctoringReviewActions({
           ) : (
             <CheckCircle2 className="h-4 w-4" />
           )}
-          {isReactivated ? "Examen Reactivado" : "Reactivar Examen (Falso Positivo)"}
+          {isReactivated ? "Examen Reactivado" : "Reactivar Examen"}
         </Button>
       )}
     </div>

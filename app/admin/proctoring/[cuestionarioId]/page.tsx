@@ -3,19 +3,17 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
-  AlertTriangle,
   User,
   Clock,
   CheckCircle2,
-  XCircle,
-  RotateCcw,
   GraduationCap,
+  Folder,
 } from "lucide-react";
 
 interface Props {
@@ -23,7 +21,7 @@ interface Props {
 }
 
 export const metadata = {
-  title: "Alumnos con Incidencias — Proctoring",
+  title: "Alumnos con Incidencias — Supervisión",
 };
 
 export default async function AdminProctoringCuestionarioPage({ params }: Props) {
@@ -49,7 +47,7 @@ export default async function AdminProctoringCuestionarioPage({ params }: Props)
 
   if (!cuestionario) notFound();
 
-  // Buscar intentos de este cuestionario que registraron incidencias o estados especiales
+  // Buscar todos los intentos de este cuestionario que registraron incidencias o estados especiales
   const intentos = await prisma.intento.findMany({
     where: {
       cuestionarioId,
@@ -72,16 +70,59 @@ export default async function AdminProctoringCuestionarioPage({ params }: Props)
         orderBy: { creadoEn: "desc" },
         select: {
           id: true,
-          nivelAlerta: true,
-          confianza: true,
           estadoRevision: true,
-          tipoEvidencia: true,
           creadoEn: true,
         },
       },
     },
-    orderBy: { creadoEn: "desc" },
+    orderBy: { creadoEn: "asc" },
   });
+
+  // Agrupar intentos por Alumno (Nivel 2: Lista limpia de Alumnos)
+  type StudentGroup = {
+    usuario: {
+      id: string;
+      nombre: string;
+      email: string;
+    };
+    intentosCount: number;
+    totalAlertas: number;
+    alertasPendientes: number;
+    ultimaEvidenciaDate?: Date;
+  };
+
+  const studentGroupsMap = new Map<string, StudentGroup>();
+
+  for (const intento of intentos) {
+    const studentId = intento.usuario.id;
+    if (!studentGroupsMap.has(studentId)) {
+      studentGroupsMap.set(studentId, {
+        usuario: intento.usuario,
+        intentosCount: 0,
+        totalAlertas: 0,
+        alertasPendientes: 0,
+      });
+    }
+
+    const group = studentGroupsMap.get(studentId)!;
+    group.intentosCount += 1;
+    group.totalAlertas += intento.alertasProctoring.length;
+    group.alertasPendientes += intento.alertasProctoring.filter(
+      (a) => a.estadoRevision === "PENDIENTE"
+    ).length;
+
+    const lastAlert = intento.alertasProctoring[0];
+    if (lastAlert) {
+      if (
+        !group.ultimaEvidenciaDate ||
+        new Date(lastAlert.creadoEn) > new Date(group.ultimaEvidenciaDate)
+      ) {
+        group.ultimaEvidenciaDate = new Date(lastAlert.creadoEn);
+      }
+    }
+  }
+
+  const studentGroups = Array.from(studentGroupsMap.values());
 
   return (
     <div className="space-y-8">
@@ -110,18 +151,18 @@ export default async function AdminProctoringCuestionarioPage({ params }: Props)
               {cuestionario.titulo}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Alumnos que registraron incidencias o interrupciones durante este cuestionario.
+              Selecciona un alumno para revisar los intentos con incidencias registradas.
             </p>
           </div>
 
           <div className="rounded-2xl border border-border/60 bg-card/60 px-4 py-3 text-sm flex items-center gap-3">
-            <span className="text-muted-foreground">Total alumnos en revisión:</span>
-            <span className="font-bold text-foreground text-base">{intentos.length}</span>
+            <span className="text-muted-foreground">Alumnos con incidencias:</span>
+            <span className="font-bold text-foreground text-base">{studentGroups.length}</span>
           </div>
         </div>
       </div>
 
-      {intentos.length === 0 ? (
+      {studentGroups.length === 0 ? (
         <Card className="border border-dashed border-border/70 bg-card/40">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <CheckCircle2 className="mb-4 h-12 w-12 text-emerald-500/80" />
@@ -129,90 +170,55 @@ export default async function AdminProctoringCuestionarioPage({ params }: Props)
               Sin alumnos con incidencias
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Ningún alumno ha registrado alertas graves o bloqueos en este cuestionario.
+              Ningún alumno ha registrado alertas o bloqueos en este cuestionario.
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
-          {intentos.map((intento) => {
-            const alertasPendientes = intento.alertasProctoring.filter((a) => a.estadoRevision === "PENDIENTE");
-            const ultimaAlerta = intento.alertasProctoring[0];
-
-            let estadoBadge = (
-              <Badge variant="outline" className="bg-secondary text-muted-foreground">
-                En Progreso
-              </Badge>
-            );
-
-            if (intento.estado === "PAUSADO_REVISION_IA") {
-              estadoBadge = (
-                <Badge className="bg-destructive/10 text-destructive border-destructive/20 font-bold">
-                  <AlertTriangle className="h-3.5 w-3.5 mr-1" />
-                  Examen Bloqueado (Pausado por IA)
-                </Badge>
-              );
-            } else if (intento.estado === "CANCELADO_CONFIRMADO") {
-              estadoBadge = (
-                <Badge className="bg-destructive text-destructive-foreground font-bold">
-                  <XCircle className="h-3.5 w-3.5 mr-1" />
-                  Cancelado por Irregularidad
-                </Badge>
-              );
-            } else if (intento.estado === "REACTIVADO_POR_ADMIN") {
-              estadoBadge = (
-                <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold">
-                  <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                  Reactivado por Profesor
-                </Badge>
-              );
-            } else if (intento.estado === "ENVIADO" || intento.estado === "CALIFICADO") {
-              estadoBadge = (
-                <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold">
-                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                  Examen Entregado (Con Advertencia)
-                </Badge>
-              );
-            }
-
+          {studentGroups.map((group) => {
             return (
               <Card
-                key={intento.id}
-                className="border border-border/60 hover:border-primary/40 bg-card/60 backdrop-blur-xl transition-all duration-200"
+                key={group.usuario.id}
+                className="border border-border/60 hover:border-primary/40 bg-card/60 backdrop-blur-xl transition-all duration-200 shadow-sm"
               >
                 <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-5">
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
-                          <User className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-foreground text-base leading-snug">
-                            {intento.usuario.nombre}
-                          </h3>
-                          <p className="text-xs text-muted-foreground">
-                            {intento.usuario.email}
-                          </p>
-                        </div>
+                      <div className="h-10 w-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-base border border-primary/20">
+                        <User className="h-5 w-5" />
                       </div>
-                      {estadoBadge}
+                      <div>
+                        <h3 className="font-bold text-foreground text-lg leading-snug">
+                          {group.usuario.nombre}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          {group.usuario.email}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1 flex-wrap">
+                      <span className="flex items-center gap-1.5 font-bold text-foreground bg-secondary px-2.5 py-1 rounded-lg">
+                        <Folder className="h-3.5 w-3.5 text-amber-500" />
+                        {group.intentosCount} {group.intentosCount === 1 ? "carpeta de intento" : "carpetas de intentos"}
+                      </span>
+
                       <span className="flex items-center gap-1 font-medium">
                         <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
-                        {intento.alertasProctoring.length} {intento.alertasProctoring.length === 1 ? "incidencia registrada" : "incidencias registradas"}
+                        {group.totalAlertas} {group.totalAlertas === 1 ? "incidencia respaldada" : "incidencias respaldadas"}
                       </span>
-                      {alertasPendientes.length > 0 && (
+
+                      {group.alertasPendientes > 0 && (
                         <span className="font-bold text-amber-500">
-                          ({alertasPendientes.length} pendiente{alertasPendientes.length > 1 ? "s" : ""} de revisión)
+                          ({group.alertasPendientes} pendiente{group.alertasPendientes > 1 ? "s" : ""} de revisión)
                         </span>
                       )}
-                      {ultimaAlerta && (
+
+                      {group.ultimaEvidenciaDate && (
                         <span className="flex items-center gap-1">
                           <Clock className="h-3.5 w-3.5" />
-                          Última evidencia: {new Date(ultimaAlerta.creadoEn).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}
+                          Última incidencia: {group.ultimaEvidenciaDate.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}
                         </span>
                       )}
                     </div>
@@ -220,11 +226,15 @@ export default async function AdminProctoringCuestionarioPage({ params }: Props)
 
                   <div className="shrink-0">
                     <Button
-                      render={<Link href={`/admin/proctoring/${cuestionarioId}/${intento.id}`} />}
+                      render={
+                        <Link
+                          href={`/admin/proctoring/${cuestionarioId}/${group.usuario.id}`}
+                        />
+                      }
                       nativeButton={false}
                       className="w-full md:w-auto rounded-xl font-bold gap-1.5"
                     >
-                      Ver Evidencias e Incidencias
+                      Ver Carpetas de Intentos
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>

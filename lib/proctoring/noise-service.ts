@@ -31,6 +31,8 @@ export async function processProctoringNoise({
     where: { id: intentoId, usuarioId },
     select: {
       id: true,
+      usuarioId: true,
+      cuestionarioId: true,
       estado: true,
       creadoEn: true,
       reactivadoEn: true,
@@ -140,13 +142,26 @@ export async function processProctoringNoise({
   if (result.alert) {
     const alertId = result.alert.id;
     const now = new Date();
+
+    // Determinar el número de intento correlativo del alumno en este cuestionario
+    const attemptCount = await prisma.intento.count({
+      where: {
+        usuarioId: intento.usuarioId,
+        cuestionarioId: intento.cuestionarioId,
+        creadoEn: { lte: intento.creadoEn },
+      },
+    });
+
+    const isReactivated = Boolean(intento.reactivadoEn && now >= intento.reactivadoEn);
+
     void uploadEvidenceBufferToDrive({
       fileBuffer: bytes,
       fileName: `ruido-${now.toISOString().replace(/[:.]/g, "-")}.webm`,
       mimeType: "audio/webm",
       cuestionarioTitulo: intento.cuestionario.titulo,
       nombreAlumno: intento.usuario.nombre,
-      intentoId,
+      intentoNumero: attemptCount,
+      isReactivated,
     }).then(async (driveResult) => {
       if (driveResult) {
         await prisma.alertaProctoring.update({

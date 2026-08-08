@@ -9,7 +9,8 @@ type UploadBufferInput = {
   mimeType: "image/jpeg" | "audio/webm";
   cuestionarioTitulo: string;
   nombreAlumno: string;
-  intentoId: string;
+  intentoNumero?: number;
+  isReactivated?: boolean;
 };
 
 export type DriveUploadResult = {
@@ -105,7 +106,8 @@ export async function uploadEvidenceBufferToDrive({
   mimeType,
   cuestionarioTitulo,
   nombreAlumno,
-  intentoId,
+  intentoNumero = 1,
+  isReactivated = false,
 }: UploadBufferInput): Promise<DriveUploadResult | null> {
   try {
     const drive = getGoogleDriveClient();
@@ -129,9 +131,13 @@ export async function uploadEvidenceBufferToDrive({
       cuestionarioFolderId
     );
 
+    const intentoLabel = isReactivated
+      ? `Intento ${intentoNumero} (Reactivado)`
+      : `Intento ${intentoNumero}`;
+
     const intentoFolderId = await getOrCreateFolder(
       drive,
-      `Intento 1`,
+      intentoLabel,
       alumnoFolderId
     );
 
