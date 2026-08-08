@@ -183,6 +183,8 @@ model AlertaProctoring {
   revisadoPorId  String?
   revisadoEn     DateTime?
   tipoEvidencia  TipoEvidenciaProctoring  @default(SNAPSHOT_CAMARA)
+  driveFileId    String?
+  driveWebViewLink String?
   creadoEn       DateTime                 @default(now())
   actualizadoEn  DateTime                 @updatedAt
 

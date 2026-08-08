@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { MAX_FAULTS_BEFORE_BLOCK } from "@/lib/proctoring/config";
 import { saveNoiseRecording } from "@/lib/proctoring/storage";
+import { uploadEvidenceBufferToDrive } from "@/lib/proctoring/drive";
 import {
   getActiveAttemptRemainingSeconds,
   getQuizEstimatedMinutes,
@@ -37,6 +38,7 @@ export async function processProctoringNoise({
       usuario: { select: { nombre: true } },
       cuestionario: {
         select: {
+          titulo: true,
           preguntas: { select: { tipo: true } },
         },
       },
@@ -134,6 +136,29 @@ export async function processProctoringNoise({
 
     return { alert, newFaultCount, shouldBlock };
   });
+
+  if (result.alert) {
+    const alertId = result.alert.id;
+    const now = new Date();
+    void uploadEvidenceBufferToDrive({
+      fileBuffer: bytes,
+      fileName: `ruido-${now.toISOString().replace(/[:.]/g, "-")}.webm`,
+      mimeType: "audio/webm",
+      cuestionarioTitulo: intento.cuestionario.titulo,
+      nombreAlumno: intento.usuario.nombre,
+      intentoId,
+    }).then(async (driveResult) => {
+      if (driveResult) {
+        await prisma.alertaProctoring.update({
+          where: { id: alertId },
+          data: {
+            driveFileId: driveResult.driveFileId,
+            driveWebViewLink: driveResult.driveWebViewLink,
+          },
+        });
+      }
+    });
+  }
 
   const blocked = result.shouldBlock;
 

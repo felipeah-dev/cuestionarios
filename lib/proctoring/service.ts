@@ -7,6 +7,7 @@ import {
 import { analyzeProctoringSnapshot } from "@/lib/proctoring/gemini";
 import { mapAlertLevel } from "@/lib/proctoring/schema";
 import { saveProctoringSnapshot } from "@/lib/proctoring/storage";
+import { uploadEvidenceBufferToDrive } from "@/lib/proctoring/drive";
 import {
   getActiveAttemptRemainingSeconds,
   getQuizEstimatedMinutes,
@@ -62,6 +63,7 @@ export async function processProctoringSnapshot({
       usuario: { select: { nombre: true } },
       cuestionario: {
         select: {
+          titulo: true,
           preguntas: { select: { tipo: true } },
         },
       },
@@ -193,6 +195,29 @@ export async function processProctoringSnapshot({
 
     return { alert, newFaultCount, shouldBlock };
   });
+
+  if (result.alert) {
+    const alertId = result.alert.id;
+    const now = new Date();
+    void uploadEvidenceBufferToDrive({
+      fileBuffer: bytes,
+      fileName: `foto-${now.toISOString().replace(/[:.]/g, "-")}.jpg`,
+      mimeType: "image/jpeg",
+      cuestionarioTitulo: intento.cuestionario.titulo,
+      nombreAlumno: intento.usuario.nombre,
+      intentoId,
+    }).then(async (driveResult) => {
+      if (driveResult) {
+        await prisma.alertaProctoring.update({
+          where: { id: alertId },
+          data: {
+            driveFileId: driveResult.driveFileId,
+            driveWebViewLink: driveResult.driveWebViewLink,
+          },
+        });
+      }
+    });
+  }
 
   const blocked = result.shouldBlock;
   const warned = isHighAlert && !blocked;

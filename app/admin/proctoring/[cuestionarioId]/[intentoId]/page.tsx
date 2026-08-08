@@ -18,6 +18,7 @@ import {
   XCircle,
   RotateCcw,
   GraduationCap,
+  ExternalLink,
 } from "lucide-react";
 
 interface Props {
@@ -237,12 +238,25 @@ export default async function AdminProctoringIntentoDetallePage({ params }: Prop
                         </Badge>
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" />
-                        {new Date(alert.creadoEn).toLocaleString("es-MX", {
-                          dateStyle: "medium",
-                          timeStyle: "medium",
-                        })}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          {new Date(alert.creadoEn).toLocaleString("es-MX", {
+                            dateStyle: "medium",
+                            timeStyle: "medium",
+                          })}
+                        </span>
+                        {alert.driveWebViewLink && (
+                          <a
+                            href={alert.driveWebViewLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-bold text-xs text-primary hover:underline bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg border border-primary/20 transition-colors"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Ver en Drive ↗
+                          </a>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
