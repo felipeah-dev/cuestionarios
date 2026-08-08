@@ -36,16 +36,16 @@ export const MAX_FAULTS_BEFORE_BLOCK = 2;
 // ─── Detección de ruido ───────────────────────────────────────────────────────
 
 /**
- * Margen en dB sobre el baseline calibrado que dispara la alerta de ruido (+6 dB ≈ 2.0x).
- * En combinación con el filtro pasa-banda vocal (300Hz-3400Hz), detecta susurros y murmullo.
+ * Margen en dB sobre el baseline calibrado que dispara la alerta de ruido (+4 dB ≈ 1.58x).
+ * Se aplica sobre la señal ambiental completa para no ocultar sonidos no vocales.
  */
-export const NOISE_DB_OVER_BASELINE = 6;
-export const NOISE_RMS_MULTIPLIER = Math.pow(10, NOISE_DB_OVER_BASELINE / 20); // ≈ 2.0x
+export const NOISE_DB_OVER_BASELINE = 4;
+export const NOISE_RMS_MULTIPLIER = Math.pow(10, NOISE_DB_OVER_BASELINE / 20); // ≈ 1.58x
 
 /**
- * Piso mínimo absoluto de RMS (0.012) para capturar voz susurrada y murmullo.
+ * Piso mínimo absoluto de RMS (0.005) para micrófonos con señal de entrada baja.
  */
-export const MIN_NOISE_RMS_FLOOR = 0.012;
+export const MIN_NOISE_RMS_FLOOR = 0.005;
 
 /** Milisegundos que el ruido debe sostenerse sobre el umbral para generar una falta. */
 export function getNoiseSustainedMs() {
@@ -74,6 +74,7 @@ export const ALLOWED_NOISE_MIME_TYPES = [
   "audio/webm",
   "audio/ogg",
   "audio/wav",
+  "audio/mp4",
 ] as const;
 
 // ─── Helpers privados ─────────────────────────────────────────────────────────

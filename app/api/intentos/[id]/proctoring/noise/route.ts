@@ -37,6 +37,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(result);
   } catch (error) {
+    console.error("No se pudo procesar la evidencia de ruido:", error);
     return NextResponse.json(
       {
         error:

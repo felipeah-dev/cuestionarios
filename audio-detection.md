@@ -1,4 +1,4 @@
-# Justificación Técnica — Sistema de Detección de Ruido Excesivo y Filtrado Vocal
+# Justificación Técnica — Sistema de Detección de Ruido Excesivo
 
 ## Contexto del Problema
 
@@ -26,34 +26,30 @@ Adicionalmente, el rango de frecuencias de la **voz humana (hablada y susurrada)
 
 ## 2. La Arquitectura de Audio Implementada
 
-### 2.1. Filtro Pasa-Banda Vocal (`BiquadFilterNode`)
-Para aislar la voz humana y descartar completamente el tecleo de laptop/teclado mecánico, la cadena de audio de la Web Audio API utiliza un **filtro pasa-banda vocal**:
+### 2.1. Señal ambiental completa
+El analizador recibe la señal completa del micrófono. Esto permite detectar voz,
+golpes, música y otros sonidos elevados sin que un filtro estrecho los descarte:
 
 ```ts
 const audioCtx = new AudioContext();
 const source = audioCtx.createMediaStreamSource(stream);
 
-// Filtro Pasa-Banda Vocal (300 Hz a 3400 Hz)
-const bandpass = audioCtx.createBiquadFilter();
-bandpass.type = "bandpass";
-bandpass.frequency.value = 1850; // Frecuencia central de formantes de voz
-bandpass.Q.value = 0.75; // Ancho de banda espectral para cubrir 300Hz-3400Hz
-
 const analyser = audioCtx.createAnalyser();
-source.connect(bandpass);
-bandpass.connect(analyser);
+analyser.smoothingTimeConstant = 0.2;
+source.connect(analyser);
 ```
 
-### 2.2. Supresión de Ruido Nativa de WebRTC
-Al solicitar acceso a medios, se activan los algoritmos de cancelación de ruido del navegador para filtrar zumbidos y clics mecánicos:
+### 2.2. Captura sin supresión
+El procesamiento automático se desactiva porque suprimir el ruido antes de medirlo
+impediría detectar la conducta que se quiere supervisar:
 
 ```ts
 const stream = await navigator.mediaDevices.getUserMedia({
   video: true,
   audio: {
-    autoGainControl: true,
-    noiseSuppression: true,   // Elimina clics mecánicos y ruido blanco de fondo
-    echoCancellation: true,
+    autoGainControl: false,
+    noiseSuppression: false,
+    echoCancellation: false,
   },
 });
 ```
@@ -65,8 +61,8 @@ const stream = await navigator.mediaDevices.getUserMedia({
 ### 3.1. Piso Mínimo RMS y Umbral Dinámico
 Para capturar desde **voz hablada regular** hasta **susurros y murmullos**, el sistema utiliza un piso mínimo absoluto y un multiplicador ajustado sobre el silencio calibrado:
 
-- **`MIN_NOISE_RMS_FLOOR = 0.012`**: Piso de volumen mínimo para detectar voz baja y susurros cerca del micrófono.
-- **`NOISE_DB_OVER_BASELINE = 6 dB` (+2.0x)**: El umbral dinámico se activa si la voz supera en 6 dB el silencio base del entorno.
+- **`MIN_NOISE_RMS_FLOOR = 0.005`**: Piso mínimo compatible con micrófonos de señal baja.
+- **`NOISE_DB_OVER_BASELINE = 4 dB` (+1.58x)**: El umbral se activa al superar en 4 dB la mediana del ambiente calibrado.
 
 ```ts
 const rawThreshold = noiseBaselineRef.current * NOISE_RMS_MULTIPLIER;
@@ -90,15 +86,15 @@ Una vez registrada una falta de ruido y grabados los 5 segundos de audio `.webm`
 ```
 requestMediaAccess()
 │
-├─ getUserMedia({ noiseSuppression: true, echoCancellation: true })
+├─ getUserMedia({ noiseSuppression: false, echoCancellation: false })
 │
 ├─ CALIBRACIÓN (5 segundos iniciales)
-│    AudioContext → MediaStreamSource → BiquadFilterNode (300Hz-3400Hz) → AnalyserNode
-│    Promediar RMS de silencio base (noiseFloorRMS)
+│    AudioContext → MediaStreamSource → AnalyserNode
+│    Calcular la mediana RMS del silencio base (noiseFloorRMS)
 │
 └─ DETECCIÓN CONTINUA (requestAnimationFrame)
      rmsActual = calcRMS(currentBuffer)
-     threshold = Math.max(noiseFloorRMS * 2.0, 0.012)
+     threshold = Math.max(noiseFloorRMS * 1.58, 0.005)
      
      ¿rmsActual > threshold?
         No → Speech hangover (600ms de gracia), luego resetear timer
@@ -115,9 +111,9 @@ requestMediaAccess()
 
 Cuando se confirma una falta de ruido, el sistema almacena:
 
-1. **Evidencia de audio `.webm` (5 segundos)** en:
+1. **Evidencia de audio (5 segundos)** en una carpeta privada de Google Drive:
    ```text
-   storage/proctoring/<nombreAlumno>/<intentoId>/ruido-<timestamp>.webm
+   <nombreAlumno>-<intentoId>-ruido-<timestamp>.<webm|ogg|m4a>
    ```
 
 2. **Registro en Base de Datos (`AlertaProctoring`)**:
@@ -131,8 +127,8 @@ Cuando se confirma una falta de ruido, el sistema almacena:
        "detection_method": "web_audio_api_rms",
        "noise_above_baseline": true,
        "sustained_seconds": 3,
-       "agc_disabled": false,
-       "descripcion_breve": "Se detectó ruido excesivo o habla continua en el micrófono (+15 dB sobre el nivel base de silencio)."
+       "agc_disabled": true,
+       "descripcion_breve": "Se detectó ruido excesivo o habla continua en el micrófono (+4 dB sobre el nivel base de silencio)."
      }
    }
    ```

@@ -1,10 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import {
-  getSnapshotMimeTypeFromPath,
-  readProctoringSnapshot,
-} from "@/lib/proctoring/storage";
+import { readProctoringEvidence } from "@/lib/proctoring/storage";
 
 export const runtime = "nodejs";
 
@@ -36,10 +33,10 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   }
 
   try {
-    const bytes = await readProctoringSnapshot(alert.snapshotPath);
-    return new NextResponse(bytes, {
+    const evidence = await readProctoringEvidence(alert.snapshotPath);
+    return new NextResponse(evidence.bytes, {
       headers: {
-        "Content-Type": getSnapshotMimeTypeFromPath(alert.snapshotPath),
+        "Content-Type": evidence.mimeType,
         "Cache-Control": "private, no-store",
       },
     });

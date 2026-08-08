@@ -2,8 +2,14 @@ import { getCurrentUser } from "@/lib/auth";
 import { finalizeQuizAttemptForUser } from "@/lib/quiz-finalization";
 import { prisma } from "@/lib/prisma";
 import {
+  getNoiseCalibrationMs,
+  getNoiseCooldownMs,
+  getNoiseRecordingMs,
+  getNoiseSustainedMs,
   getProctoringCaptureMaxSeconds,
   getProctoringCaptureMinSeconds,
+  MIN_NOISE_RMS_FLOOR,
+  NOISE_RMS_MULTIPLIER,
 } from "@/lib/proctoring/config";
 import {
   getActiveAttemptRemainingSeconds,
@@ -96,6 +102,12 @@ export default async function ResponderCuestionarioPage({ params }: Props) {
         proctoringConfig={{
           captureMinSeconds: getProctoringCaptureMinSeconds(),
           captureMaxSeconds: getProctoringCaptureMaxSeconds(),
+          noiseRmsMultiplier: NOISE_RMS_MULTIPLIER,
+          minNoiseRmsFloor: MIN_NOISE_RMS_FLOOR,
+          noiseSustainedMs: getNoiseSustainedMs(),
+          noiseRecordingMs: getNoiseRecordingMs(),
+          noiseCooldownMs: getNoiseCooldownMs(),
+          noiseCalibrationMs: getNoiseCalibrationMs(),
         }}
       />
     </div>

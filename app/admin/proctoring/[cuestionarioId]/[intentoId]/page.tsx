@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ProctoringReviewActions } from "../../_components/ProctoringReviewActions";
 import {
@@ -46,7 +46,7 @@ function getAiDescription(json: unknown, isNoise = false): string {
     return (json as Record<string, unknown>).detalles as string;
   }
   if (isNoise) {
-    return "Se detectó ruido excesivo o habla continua en el micrófono (+15 dB sobre el nivel base de silencio).";
+    return "Se detectó ruido excesivo o habla continua en el micrófono (+4 dB sobre el nivel base de silencio).";
   }
   return "Sin descripción detallada";
 }
@@ -255,7 +255,7 @@ export default async function AdminProctoringIntentoDetallePage({ params }: Prop
                           <div className="w-full p-6 text-center space-y-4">
                             <Volume2 className="h-12 w-12 text-amber-500 mx-auto animate-pulse" />
                             <p className="text-xs font-semibold text-muted-foreground">
-                              Grabación de evidencia de audio (+15 dB sostenido o ráfagas):
+                              Grabación de evidencia de audio (+4 dB sostenido o ráfagas):
                             </p>
                             <audio
                               controls

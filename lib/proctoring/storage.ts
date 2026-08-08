@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   ALLOWED_NOISE_MIME_TYPES,
@@ -7,6 +7,11 @@ import {
   MAX_SNAPSHOT_BYTES,
   PROCTORING_STORAGE_ROOT,
 } from "@/lib/proctoring/config";
+import {
+  isDriveEvidenceReference,
+  readDriveEvidence,
+  uploadDriveEvidence,
+} from "@/lib/proctoring/drive-storage";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -65,9 +70,9 @@ export async function saveProctoringSnapshot({
   const extension = getExtensionForMimeType(mimeType);
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const alumnoDir = sanitizeAlumnoName(nombreAlumno);
-  const relativePath = path.join(alumnoDir, intentoId, `foto-${timestamp}.${extension}`);
+  const fileName = `${alumnoDir}-${intentoId}-foto-${timestamp}.${extension}`;
 
-  return saveToStorage(relativePath, bytes);
+  return saveToDrive(fileName, bytes, mimeType);
 }
 
 export async function saveNoiseRecording({
@@ -81,30 +86,42 @@ export async function saveNoiseRecording({
   const extension = getExtensionForAudioMimeType(mimeType);
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const alumnoDir = sanitizeAlumnoName(nombreAlumno);
-  const relativePath = path.join(alumnoDir, intentoId, `ruido-${timestamp}.${extension}`);
+  const fileName = `${alumnoDir}-${intentoId}-ruido-${timestamp}.${extension}`;
 
-  return saveToStorage(relativePath, bytes);
+  return saveToDrive(fileName, bytes, mimeType);
 }
 
 // ─── Lectura ──────────────────────────────────────────────────────────────────
 
-export async function readProctoringSnapshot(relativePath: string) {
-  const storageRoot = path.resolve(PROCTORING_STORAGE_ROOT);
-  const absolutePath = path.resolve(PROCTORING_STORAGE_ROOT, relativePath);
+export async function readProctoringEvidence(reference: string) {
+  if (isDriveEvidenceReference(reference)) {
+    return readDriveEvidence(reference);
+  }
 
-  if (!absolutePath.startsWith(storageRoot)) {
+  const storageRoot = path.resolve(PROCTORING_STORAGE_ROOT);
+  const absolutePath = path.resolve(PROCTORING_STORAGE_ROOT, reference);
+  const pathFromRoot = path.relative(storageRoot, absolutePath);
+
+  if (pathFromRoot.startsWith("..") || path.isAbsolute(pathFromRoot)) {
     throw new Error("Ruta de evidencia invalida");
   }
 
-  return readFile(absolutePath);
+  return {
+    bytes: await readFile(absolutePath),
+    mimeType: getEvidenceMimeTypeFromPath(reference),
+  };
 }
 
 // ─── MIME helpers ─────────────────────────────────────────────────────────────
 
-export function getSnapshotMimeTypeFromPath(snapshotPath: string) {
-  const extension = path.extname(snapshotPath).toLowerCase();
+export function getEvidenceMimeTypeFromPath(reference: string) {
+  const extension = path.extname(reference).toLowerCase();
   if (extension === ".png") return "image/png";
   if (extension === ".webp") return "image/webp";
+  if (extension === ".webm") return "audio/webm";
+  if (extension === ".ogg") return "audio/ogg";
+  if (extension === ".wav") return "audio/wav";
+  if (extension === ".m4a" || extension === ".mp4") return "audio/mp4";
   return "image/jpeg";
 }
 
@@ -123,21 +140,14 @@ function sanitizeAlumnoName(nombre: string): string {
     .slice(0, 64);                   // límite de longitud
 }
 
-async function saveToStorage(relativePath: string, bytes: Buffer) {
-  const storageRoot = path.resolve(PROCTORING_STORAGE_ROOT);
-  const absolutePath = path.resolve(PROCTORING_STORAGE_ROOT, relativePath);
-  const absoluteDirectory = path.dirname(absolutePath);
-
-  if (!absolutePath.startsWith(storageRoot)) {
-    throw new Error("Ruta de evidencia invalida");
-  }
-
-  await mkdir(absoluteDirectory, { recursive: true });
-  await writeFile(absolutePath, bytes);
-
+async function saveToDrive(fileName: string, bytes: Buffer, mimeType: string) {
+  const relativePath = await uploadDriveEvidence({
+    bytes,
+    fileName,
+    mimeType: mimeType.split(";")[0].trim().toLowerCase(),
+  });
   return {
-    relativePath: relativePath.replace(/\\/g, "/"),
-    absolutePath,
+    relativePath,
   };
 }
 
@@ -152,6 +162,7 @@ function getExtensionForAudioMimeType(mimeType: string) {
   const cleanMime = mimeType.split(";")[0].trim().toLowerCase();
   if (cleanMime === "audio/ogg") return "ogg";
   if (cleanMime === "audio/wav") return "wav";
+  if (cleanMime === "audio/mp4") return "m4a";
   return "webm";
 }
 

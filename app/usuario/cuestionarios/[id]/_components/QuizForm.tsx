@@ -24,7 +24,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   CheckCircle2,
@@ -87,6 +86,12 @@ interface QuizFormProps {
   proctoringConfig: {
     captureMinSeconds: number;
     captureMaxSeconds: number;
+    noiseRmsMultiplier: number;
+    minNoiseRmsFloor: number;
+    noiseSustainedMs: number;
+    noiseRecordingMs: number;
+    noiseCooldownMs: number;
+    noiseCalibrationMs: number;
   };
 }
 
@@ -105,18 +110,11 @@ type MediaStatus =
   | "denied"
   | "unsupported";
 
-/** Factor multiplicador para el umbral de ruido: +6 dB sobre el baseline (10^(6/20) ≈ 2.0) */
-const NOISE_RMS_MULTIPLIER = 2.0;
-/** Piso mínimo absoluto de RMS (0.012) para capturar susurros y murmullo */
-const MIN_NOISE_RMS_FLOOR = 0.012;
+/** El umbral adaptativo y el piso RMS se reciben desde la configuracion del servidor. */
 /** Milisegundos sostenidos de ruido para disparar una falta */
-const NOISE_SUSTAINED_MS = 3000;
 /** Milisegundos de audio a grabar como evidencia */
-const NOISE_RECORDING_MS = 5000;
 /** Cooldown entre alertas de ruido */
-const NOISE_COOLDOWN_MS = 5000;
 /** Duración de la calibración inicial */
-const NOISE_CALIBRATION_MS = 5000;
 /** Tamaño del buffer del analizador FFT */
 const ANALYSER_FFT_SIZE = 2048;
 
@@ -128,6 +126,24 @@ function calcRms(buffer: Float32Array): number {
     sum += buffer[i] * buffer[i];
   }
   return Math.sqrt(sum / buffer.length);
+}
+
+function getSupportedAudioMimeType() {
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/ogg",
+    "audio/mp4",
+  ];
+  return candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+}
+
+function getAudioFileName(mimeType: string) {
+  const cleanMime = mimeType.split(";")[0].toLowerCase();
+  if (cleanMime === "audio/ogg") return "ruido.ogg";
+  if (cleanMime === "audio/mp4") return "ruido.m4a";
+  return "ruido.webm";
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -179,8 +195,10 @@ export default function QuizForm({
 
   // ── Estado de ruido ──
   const [noiseLevelRms, setNoiseLevelRms] = useState(0);
+  const [noiseThresholdRms, setNoiseThresholdRms] = useState(0);
   const [noiseIsAboveThreshold, setNoiseIsAboveThreshold] = useState(false);
   const [noiseIsRecording, setNoiseIsRecording] = useState(false);
+  const [noiseMonitorError, setNoiseMonitorError] = useState<string | null>(null);
 
   // ── Estado de respuestas ──
   const [respuestas, setRespuestas] = useState<
@@ -278,7 +296,7 @@ export default function QuizForm({
     }) => {
       const defaultDesc =
         data.tipo === "ruido"
-          ? "Se detectó ruido excesivo sostenido por 3 segundos continuos (+15 dB sobre el nivel base)."
+          ? "Se detectó ruido excesivo sostenido por 3 segundos continuos (+4 dB sobre el nivel base)."
           : "Se detectó una irregularidad visual en tu sesión.";
 
       if (data.blocked) {
@@ -377,15 +395,24 @@ export default function QuizForm({
     async (audioBlob: Blob) => {
       if (!activeAttempt) return;
       try {
+        if (audioBlob.size === 0) {
+          throw new Error("El navegador genero una grabacion vacia");
+        }
+
         const formData = new FormData();
-        formData.append("audio", audioBlob, "ruido.webm");
+        formData.append("audio", audioBlob, getAudioFileName(audioBlob.type));
 
         const response = await fetch(
           `/api/intentos/${activeAttempt.id}/proctoring/noise`,
           { method: "POST", body: formData }
         );
 
-        if (!response.ok) return;
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          throw new Error(body?.error || "No se pudo guardar la grabacion");
+        }
 
         const data = (await response.json()) as {
           warned?: boolean;
@@ -393,6 +420,7 @@ export default function QuizForm({
           faultCount?: number;
           descripcion?: string;
         };
+        setNoiseMonitorError(null);
 
         if (data.warned || data.blocked) {
           handleProctoringFault({
@@ -405,6 +433,7 @@ export default function QuizForm({
         }
       } catch (error) {
         console.error("Error al enviar grabación de ruido:", error);
+        setNoiseMonitorError("No se pudo guardar la evidencia de audio");
       }
     },
     [activeAttempt, handleProctoringFault]
@@ -421,13 +450,13 @@ export default function QuizForm({
     setMediaStatus("checking");
 
     try {
-      // Habilitar supresión de ruido nativa del navegador para filtrar clics de teclado
+      // Mantener la señal cruda para detectar tanto voz como ruido ambiental elevado.
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: {
-          autoGainControl: true,
-          noiseSuppression: true,
-          echoCancellation: true,
+          autoGainControl: false,
+          noiseSuppression: false,
+          echoCancellation: false,
         },
       });
       mediaStreamRef.current = stream;
@@ -438,39 +467,33 @@ export default function QuizForm({
 
       const audioCtx = new AudioContext();
       audioContextRef.current = audioCtx;
+      await audioCtx.resume();
       const source = audioCtx.createMediaStreamSource(stream);
-
-      // Filtro pasa-banda vocal (300 Hz a 3400 Hz) para aislar la voz humana y descartar tecleos
-      const bandpass = audioCtx.createBiquadFilter();
-      bandpass.type = "bandpass";
-      bandpass.frequency.value = 1850; // Frecuencia central de formantes vocales
-      bandpass.Q.value = 0.75; // Ancho de banda espectral vocal
 
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = ANALYSER_FFT_SIZE;
+      analyser.smoothingTimeConstant = 0.2;
 
-      source.connect(bandpass);
-      bandpass.connect(analyser);
+      source.connect(analyser);
       analyserRef.current = analyser;
 
       const buffer = new Float32Array(analyser.fftSize);
-      let sumOfSquares = 0;
-      let totalSamples = 0;
+      const calibrationSamples: number[] = [];
       const startTime = Date.now();
 
       await new Promise<void>((resolve) => {
         const sampleLoop = () => {
           const elapsed = Date.now() - startTime;
-          const progress = Math.min(100, (elapsed / NOISE_CALIBRATION_MS) * 100);
+          const progress = Math.min(
+            100,
+            (elapsed / proctoringConfig.noiseCalibrationMs) * 100
+          );
           setCalibrationProgress(Math.floor(progress));
 
           analyser.getFloatTimeDomainData(buffer);
-          for (let i = 0; i < buffer.length; i++) {
-            sumOfSquares += buffer[i] * buffer[i];
-          }
-          totalSamples += buffer.length;
+          calibrationSamples.push(calcRms(buffer));
 
-          if (elapsed >= NOISE_CALIBRATION_MS) {
+          if (elapsed >= proctoringConfig.noiseCalibrationMs) {
             resolve();
           } else {
             requestAnimationFrame(sampleLoop);
@@ -479,10 +502,17 @@ export default function QuizForm({
         requestAnimationFrame(sampleLoop);
       });
 
-      // El baseline es el RMS promedio durante los 5s de silencio
-      noiseBaselineRef.current = totalSamples > 0
-        ? Math.sqrt(sumOfSquares / totalSamples)
-        : 0.01;
+      // La mediana evita que un golpe aislado durante la calibracion eleve todo el umbral.
+      calibrationSamples.sort((a, b) => a - b);
+      const middleIndex = Math.floor(calibrationSamples.length / 2);
+      noiseBaselineRef.current = calibrationSamples[middleIndex] ?? 0.0025;
+      setNoiseThresholdRms(
+        Math.max(
+          noiseBaselineRef.current * proctoringConfig.noiseRmsMultiplier,
+          proctoringConfig.minNoiseRmsFloor
+        )
+      );
+      setNoiseMonitorError(null);
 
       const attempt = await startQuizAttemptAction(cuestionario.id);
       const answerMap: Record<string, { opcionId?: string; respuestaAbierta?: string }> = {};
@@ -507,7 +537,7 @@ export default function QuizForm({
       audioContextRef.current?.close().catch(() => null);
       setMediaStatus("denied");
     }
-  }, [cuestionario.id, duracionEstimada]);
+  }, [cuestionario.id, duracionEstimada, proctoringConfig]);
 
   // ─── useEffect: limpieza al desmontar ────────────────────────────────────
 
@@ -704,7 +734,6 @@ export default function QuizForm({
 
     let stopped = false;
     let timeoutId: number | undefined;
-    let initialTimeoutId: number | undefined;
 
     const scheduleNextSnapshot = () => {
       const minSeconds = proctoringConfig.captureMinSeconds;
@@ -718,7 +747,7 @@ export default function QuizForm({
     };
 
     // Toma rápida inicial a los 3 segundos de iniciar
-    initialTimeoutId = window.setTimeout(async () => {
+    const initialTimeoutId = window.setTimeout(async () => {
       await uploadProctoringSnapshot();
       if (!stopped) scheduleNextSnapshot();
     }, 3000);
@@ -787,8 +816,12 @@ export default function QuizForm({
       const rms = calcRms(buffer);
       setNoiseLevelRms(rms);
 
-      const rawThreshold = noiseBaselineRef.current * NOISE_RMS_MULTIPLIER;
-      const threshold = Math.max(rawThreshold, MIN_NOISE_RMS_FLOOR);
+      const threshold =
+        noiseThresholdRms ||
+        Math.max(
+          noiseBaselineRef.current * proctoringConfig.noiseRmsMultiplier,
+          proctoringConfig.minNoiseRmsFloor
+        );
       const isAbove = rms > threshold;
       setNoiseIsAboveThreshold(isAbove);
 
@@ -803,7 +836,8 @@ export default function QuizForm({
         const sustainedMs = now - noiseAboveStartRef.current;
 
         // Criterio 1: Ruido acumulado/sostenido (3 segundos, ignorando pausas breves de <600ms)
-        const isSustainedViolated = sustainedMs >= NOISE_SUSTAINED_MS;
+        const isSustainedViolated =
+          sustainedMs >= proctoringConfig.noiseSustainedMs;
 
         // Criterio 2: Ráfagas cortas repetidas (3 o más ráfagas de >800ms en una ventana de 25s)
         let isBurstViolated = false;
@@ -828,14 +862,25 @@ export default function QuizForm({
             mediaStreamRef.current.getAudioTracks()
           );
 
-          const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-            ? "audio/webm;codecs=opus"
-            : "audio/webm";
+          const supportedMimeType = getSupportedAudioMimeType();
+          let recorder: MediaRecorder;
+          try {
+            recorder = supportedMimeType
+              ? new MediaRecorder(audioOnlyStream, { mimeType: supportedMimeType })
+              : new MediaRecorder(audioOnlyStream);
+          } catch (error) {
+            console.error("No se pudo iniciar la grabacion de ruido:", error);
+            noiseCooldownRef.current = false;
+            setNoiseMonitorError("El navegador no pudo iniciar la grabacion de audio");
+            animFrameId = requestAnimationFrame(analyse);
+            return;
+          }
 
-          const recorder = new MediaRecorder(audioOnlyStream, { mimeType });
+          const mimeType = recorder.mimeType || supportedMimeType || "audio/webm";
           noiseChunksRef.current = [];
           noiseRecorderRef.current = recorder;
           setNoiseIsRecording(true);
+          setNoiseMonitorError(null);
 
           recorder.ondataavailable = (e) => {
             if (e.data.size > 0) noiseChunksRef.current.push(e.data);
@@ -851,13 +896,22 @@ export default function QuizForm({
             // Liberar cooldown después del período definido
             window.setTimeout(() => {
               noiseCooldownRef.current = false;
-            }, NOISE_COOLDOWN_MS);
+            }, proctoringConfig.noiseCooldownMs);
+          };
+
+          recorder.onerror = (event) => {
+            console.error("MediaRecorder fallo al capturar audio:", event);
+            noiseRecorderRef.current = null;
+            noiseChunksRef.current = [];
+            noiseCooldownRef.current = false;
+            setNoiseIsRecording(false);
+            setNoiseMonitorError("Se interrumpio la grabacion de audio");
           };
 
           recorder.start();
           window.setTimeout(() => {
             if (recorder.state === "recording") recorder.stop();
-          }, NOISE_RECORDING_MS);
+          }, proctoringConfig.noiseRecordingMs);
         }
       } else {
         // Tolerancia a pausas naturales al hablar (Speech Hangover):
@@ -876,7 +930,13 @@ export default function QuizForm({
     animationFrameRef.current = animFrameId;
 
     return () => cancelAnimationFrame(animFrameId);
-  }, [activeAttempt, mediaStatus, sendNoiseRecording]);
+  }, [
+    activeAttempt,
+    mediaStatus,
+    noiseThresholdRms,
+    proctoringConfig,
+    sendNoiseRecording,
+  ]);
 
   // ─── Guardado de respuestas ───────────────────────────────────────────────
 
@@ -1151,9 +1211,10 @@ export default function QuizForm({
                 {/* Medidor de nivel de micrófono */}
                 <NoiseMeter
                   rms={noiseLevelRms}
-                  baseline={noiseBaselineRef.current}
+                  threshold={noiseThresholdRms}
                   isAbove={noiseIsAboveThreshold}
                   isRecording={noiseIsRecording}
+                  error={noiseMonitorError}
                 />
                 <span className="shrink-0">/</span>
                 <span className="flex items-center gap-1.5 font-medium shrink-0">
@@ -1408,21 +1469,28 @@ export default function QuizForm({
 /** Medidor visual del nivel de ruido del micrófono en tiempo real */
 function NoiseMeter({
   rms,
-  baseline,
+  threshold,
   isAbove,
   isRecording,
+  error,
 }: {
   rms: number;
-  baseline: number;
+  threshold: number;
   isAbove: boolean;
   isRecording: boolean;
+  error: string | null;
 }) {
-  const maxRms = baseline * NOISE_RMS_MULTIPLIER * 1.5;
+  const maxRms = Math.max(threshold * 1.5, 0.01);
   const barWidth = maxRms > 0 ? Math.min(100, (rms / maxRms) * 100) : 0;
 
   return (
-    <span className="flex items-center gap-1.5 font-medium shrink-0">
-      {isRecording ? (
+    <span
+      className="flex items-center gap-1.5 font-medium shrink-0"
+      title={error || "Nivel de sonido del microfono"}
+    >
+      {error ? (
+        <AlertTriangle className="h-3 w-3 text-destructive" />
+      ) : isRecording ? (
         <Volume2 className="h-3 w-3 text-destructive animate-pulse" />
       ) : (
         <Mic
@@ -1434,13 +1502,20 @@ function NoiseMeter({
       <div className="w-14 h-1.5 rounded-full bg-secondary overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-100 ${
-            isAbove ? "bg-destructive" : "bg-emerald-400"
+            error
+              ? "bg-destructive"
+              : isAbove
+                ? "bg-destructive"
+                : "bg-emerald-400"
           }`}
           style={{ width: `${barWidth}%` }}
         />
       </div>
       {isRecording && (
         <span className="text-destructive text-[9px] font-bold animate-pulse">REC</span>
+      )}
+      {error && (
+        <span className="text-destructive text-[9px] font-bold">ERROR</span>
       )}
     </span>
   );

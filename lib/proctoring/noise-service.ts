@@ -70,7 +70,7 @@ export async function processProctoringNoise({
   });
 
   const DEFAULT_NOISE_DESCRIPTION =
-    "Se detectó ruido excesivo o habla continua en el micrófono (+15 dB sobre el nivel base de silencio).";
+    "Se detectó ruido excesivo o habla continua en el micrófono (+4 dB sobre el nivel base de silencio).";
 
   const aiResultJson: Prisma.InputJsonValue = {
     detection_method: "web_audio_api_rms",
@@ -143,7 +143,7 @@ export async function processProctoringNoise({
     blocked,
     faultCount: result.newFaultCount,
     estado: blocked ? "PAUSADO_REVISION_IA" : intento.estado,
-    descripcion: "Ruido ambiental excesivo sostenido por 3 segundos continuos (+15 dB sobre el nivel base de silencio).",
+    descripcion: "Ruido ambiental excesivo sostenido por 3 segundos continuos (+4 dB sobre el nivel base de silencio).",
     alert: result.alert,
   };
 }
