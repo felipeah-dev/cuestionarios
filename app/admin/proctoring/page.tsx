@@ -14,6 +14,7 @@ import {
   GraduationCap,
   Clock,
   CheckCircle2,
+  ExternalLink,
 } from "lucide-react";
 
 export const metadata = {
@@ -76,6 +77,9 @@ export default async function AdminProctoringPage() {
     orderBy: { creadoEn: "desc" },
   });
 
+  const parentFolderId = process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID;
+  const driveUrl = parentFolderId ? `https://drive.google.com/drive/folders/${parentFolderId}` : null;
+
   return (
     <div className="space-y-8">
       {/* Header Banner */}
@@ -91,6 +95,25 @@ export default async function AdminProctoringPage() {
             Selecciona un cuestionario para revisar las incidencias detectadas y gestionar las revisiones de los alumnos.
           </p>
         </div>
+
+        {driveUrl && (
+          <Button
+            render={
+              <a
+                href={driveUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              />
+            }
+            nativeButton={false}
+            variant="outline"
+            size="default"
+            className="rounded-xl font-bold gap-2 border-primary/30 text-primary hover:bg-primary/10 shadow-sm shrink-0"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Abrir Google Drive ↗
+          </Button>
+        )}
       </div>
 
       {cuestionarios.length === 0 ? (

@@ -22,9 +22,9 @@ interface Props {
 
 const estadoConfig = {
   CALIFICADO: { label: "Calificado", className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-600" },
-  ENVIADO:    { label: "Pendiente",  className: "border-amber-500/40 bg-amber-500/10 text-amber-600" },
-  EN_PROGRESO:{ label: "En progreso",className: "border-border bg-muted text-muted-foreground" },
-  PAUSADO_REVISION_IA: { label: "Pausado IA", className: "border-warning/40 bg-warning/10 text-warning" },
+  ENVIADO: { label: "Pendiente", className: "border-amber-500/40 bg-amber-500/10 text-amber-600" },
+  EN_PROGRESO: { label: "En progreso", className: "border-border bg-muted text-muted-foreground" },
+  PAUSADO_REVISION_IA: { label: "Posible trampa", className: "border-warning/40 bg-warning/10 text-warning" },
   REACTIVADO_POR_ADMIN: { label: "Reactivado", className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-600" },
   CANCELADO_CONFIRMADO: { label: "Cancelado", className: "border-destructive/40 bg-destructive/10 text-destructive" },
 } as const;
@@ -119,10 +119,10 @@ export default async function IntentosCuestionarioPage({ params }: Props) {
                     <TableCell className="text-muted-foreground text-sm">
                       {intento.enviadoEn
                         ? new Date(intento.enviadoEn).toLocaleDateString("es-MX", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
                         : "—"}
                     </TableCell>
                     <TableCell className="text-right">

@@ -131,9 +131,6 @@ export default async function AdminProctoringIntentoDetailPage({
     });
   }
 
-  // Buscar un enlace a Drive de la evidencia para el botón superior principal
-  const driveLink = alertasProctoring.find((a) => a.driveWebViewLink)?.driveWebViewLink;
-
   let estadoBadge = (
     <Badge variant="outline" className="bg-secondary text-muted-foreground">
       En Progreso
@@ -235,31 +232,12 @@ export default async function AdminProctoringIntentoDetailPage({
                 </div>
               </div>
 
-              {/* Acciones del Profesor y Enlace Directo a Drive */}
+              {/* Acciones del Profesor */}
               <div className="shrink-0 border-t md:border-t-0 md:border-l border-border/40 pt-4 md:pt-0 md:pl-6 flex flex-col gap-3">
                 <ProctoringReviewActions
                   intentoId={intento.id}
                   estadoIntento={intento.estado}
                 />
-
-                {driveLink && (
-                  <Button
-                    render={
-                      <a
-                        href={driveLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      />
-                    }
-                    nativeButton={false}
-                    variant="outline"
-                    size="sm"
-                    className="rounded-xl font-bold gap-1.5 border-primary/30 text-primary hover:bg-primary/10 w-full"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Ver Carpeta en Drive ↗
-                  </Button>
-                )}
               </div>
             </div>
           </CardContent>

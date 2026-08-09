@@ -87,7 +87,7 @@ export default async function AdminProctoringCuestionarioPage({ params }: Props)
     };
     intentosCount: number;
     totalAlertas: number;
-    alertasPendientes: number;
+    intentosPendientes: number;
     ultimaEvidenciaDate?: Date;
   };
 
@@ -100,16 +100,21 @@ export default async function AdminProctoringCuestionarioPage({ params }: Props)
         usuario: intento.usuario,
         intentosCount: 0,
         totalAlertas: 0,
-        alertasPendientes: 0,
+        intentosPendientes: 0,
       });
     }
 
     const group = studentGroupsMap.get(studentId)!;
     group.intentosCount += 1;
     group.totalAlertas += intento.alertasProctoring.length;
-    group.alertasPendientes += intento.alertasProctoring.filter(
-      (a) => a.estadoRevision === "PENDIENTE"
-    ).length;
+
+    const isPending =
+      intento.estado === "PAUSADO_REVISION_IA" ||
+      intento.alertasProctoring.some((a) => a.estadoRevision === "PENDIENTE");
+
+    if (isPending) {
+      group.intentosPendientes += 1;
+    }
 
     const lastAlert = intento.alertasProctoring[0];
     if (lastAlert) {
@@ -209,9 +214,9 @@ export default async function AdminProctoringCuestionarioPage({ params }: Props)
                         {group.totalAlertas} {group.totalAlertas === 1 ? "incidencia respaldada" : "incidencias respaldadas"}
                       </span>
 
-                      {group.alertasPendientes > 0 && (
+                      {group.intentosPendientes > 0 && (
                         <span className="font-bold text-amber-500">
-                          ({group.alertasPendientes} pendiente{group.alertasPendientes > 1 ? "s" : ""} de revisión)
+                          ({group.intentosPendientes} {group.intentosPendientes === 1 ? "intento pendiente de revisión" : "intentos pendientes de revisión"})
                         </span>
                       )}
 

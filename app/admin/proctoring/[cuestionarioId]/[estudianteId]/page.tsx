@@ -314,7 +314,7 @@ export default async function AdminProctoringEstudiantePage({ params }: Props) {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {folderCards.map((card) => {
+          {[...folderCards].reverse().map((card) => {
             const queryParam = card.modoParam ? `?modo=${card.modoParam}` : "";
 
             return (
