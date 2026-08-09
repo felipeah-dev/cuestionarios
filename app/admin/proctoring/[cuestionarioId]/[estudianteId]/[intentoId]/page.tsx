@@ -131,13 +131,22 @@ export default async function AdminProctoringIntentoDetailPage({
     });
   }
 
+  const isCurrentSession = boundaries.length === 0 || sessionIndex === boundaries.length;
+
   let estadoBadge = (
     <Badge variant="outline" className="bg-secondary text-muted-foreground">
       En Progreso
     </Badge>
   );
 
-  if (intento.estado === "PAUSADO_REVISION_IA") {
+  if (!isCurrentSession) {
+    estadoBadge = (
+      <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold px-3 py-1 text-xs">
+        <RotateCcw className="h-4 w-4 mr-1.5" />
+        Reactivado por Profesor
+      </Badge>
+    );
+  } else if (intento.estado === "PAUSADO_REVISION_IA") {
     estadoBadge = (
       <Badge className="bg-destructive/10 text-destructive border-destructive/20 font-bold px-3 py-1 text-xs">
         <AlertTriangle className="h-4 w-4 mr-1.5" />
@@ -237,6 +246,7 @@ export default async function AdminProctoringIntentoDetailPage({
                 <ProctoringReviewActions
                   intentoId={intento.id}
                   estadoIntento={intento.estado}
+                  disabled={!isCurrentSession}
                 />
               </div>
             </div>
@@ -252,6 +262,17 @@ export default async function AdminProctoringIntentoDetailPage({
             Evidencias Registradas ({alertasProctoring.length})
           </h2>
         </div>
+
+        {!isCurrentSession && (
+          <Card className="border border-emerald-500/30 bg-emerald-500/5 backdrop-blur-xl">
+            <CardContent className="p-4 flex items-center gap-3">
+              <RotateCcw className="h-5 w-5 text-emerald-500 shrink-0" />
+              <p className="text-xs font-semibold text-emerald-500">
+                Esta carpeta corresponde a una sesión histórica que ya fue reactivada por el profesor. Las evidencias mostradas aquí ocasionaron el bloqueo de dicha sesión y se conservan como expediente histórico.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {alertasProctoring.length === 0 ? (
           <Card className="border border-dashed border-border/70 bg-card/40">

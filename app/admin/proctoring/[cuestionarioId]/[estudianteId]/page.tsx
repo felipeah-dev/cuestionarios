@@ -190,9 +190,9 @@ export default async function AdminProctoringEstudiantePage({ params }: Props) {
         if (!isCurrentSession) {
           // Sesión histórica (ya fue anulada/reactivada)
           estadoBadge = (
-            <Badge className="bg-destructive/10 text-destructive border-destructive/20 font-bold">
-              <AlertTriangle className="h-3.5 w-3.5 mr-1" />
-              Examen Bloqueado (Pre-Reactivación)
+            <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold">
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+              Reactivado por Profesor
             </Badge>
           );
         } else {
