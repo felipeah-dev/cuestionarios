@@ -10,23 +10,23 @@ interface RouteContext {
 }
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user || user.rol !== "USUARIO") {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
-  const { id } = await params;
-  const formData = await request.formData();
-  const snapshot = formData.get("snapshot");
-
-  if (!(snapshot instanceof File)) {
-    return NextResponse.json(
-      { error: "Snapshot requerido" },
-      { status: 400 }
-    );
-  }
-
   try {
+    const user = await getCurrentUser();
+    if (!user || user.rol !== "USUARIO") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const formData = await request.formData();
+    const snapshot = formData.get("snapshot");
+
+    if (!(snapshot instanceof File)) {
+      return NextResponse.json(
+        { error: "Snapshot requerido" },
+        { status: 400 }
+      );
+    }
+
     const bytes = Buffer.from(await snapshot.arrayBuffer());
     const result = await processProctoringSnapshot({
       intentoId: id,
@@ -40,6 +40,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(result);
   } catch (error) {
+    console.error("Error al procesar snapshot de proctoring:", error);
     return NextResponse.json(
       {
         error:
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
             ? error.message
             : "No se pudo procesar el snapshot",
       },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }

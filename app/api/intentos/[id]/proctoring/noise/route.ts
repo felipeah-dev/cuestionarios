@@ -10,20 +10,20 @@ interface RouteContext {
 }
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user || user.rol !== "USUARIO") {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
-  const { id } = await params;
-  const formData = await request.formData();
-  const audio = formData.get("audio");
-
-  if (!(audio instanceof File)) {
-    return NextResponse.json({ error: "Audio requerido" }, { status: 400 });
-  }
-
   try {
+    const user = await getCurrentUser();
+    if (!user || user.rol !== "USUARIO") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const formData = await request.formData();
+    const audio = formData.get("audio");
+
+    if (!(audio instanceof File)) {
+      return NextResponse.json({ error: "Audio requerido" }, { status: 400 });
+    }
+
     const bytes = Buffer.from(await audio.arrayBuffer());
     const result = await processProctoringNoise({
       intentoId: id,
@@ -37,6 +37,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(result);
   } catch (error) {
+    console.error("Error al procesar audio de proctoring:", error);
     return NextResponse.json(
       {
         error:
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
             ? error.message
             : "No se pudo procesar el audio",
       },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }
