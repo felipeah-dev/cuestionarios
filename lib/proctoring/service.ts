@@ -211,6 +211,18 @@ export async function processProctoringSnapshot({
 
     const isReactivated = Boolean(intento.reactivadoEn && now >= intento.reactivadoEn);
 
+    // Contar cuántas reactivaciones ha tenido (fronteras distintas de revisadoEn en alertas anuladas)
+    const reactivationBoundaries = await prisma.alertaProctoring.findMany({
+      where: {
+        intentoId: intento.id,
+        estadoRevision: "ANULADA_FALSO_POSITIVO",
+        revisadoEn: { not: null },
+      },
+      select: { revisadoEn: true },
+      distinct: ["revisadoEn"],
+    });
+    const reactivationCount = reactivationBoundaries.length;
+
     void uploadEvidenceBufferToDrive({
       fileBuffer: bytes,
       fileName: `foto-${now.toISOString().replace(/[:.]/g, "-")}.jpg`,
@@ -219,6 +231,7 @@ export async function processProctoringSnapshot({
       nombreAlumno: intento.usuario.nombre,
       intentoNumero: attemptCount,
       isReactivated,
+      reactivationCount,
     }).then(async (driveResult) => {
       if (driveResult) {
         await prisma.alertaProctoring.update({

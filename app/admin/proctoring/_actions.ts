@@ -98,8 +98,10 @@ export async function reactivarIntentoFalsoPositivoAction(intentoId: string) {
     );
 
   await prisma.$transaction([
+    // Solo anular alertas PENDIENTES — las ya revisadas conservan su revisadoEn original
+    // para que las fronteras de reactivación sigan intactas en la UI
     prisma.alertaProctoring.updateMany({
-      where: { intentoId: intento.id },
+      where: { intentoId: intento.id, estadoRevision: "PENDIENTE" },
       data: {
         estadoRevision: "ANULADA_FALSO_POSITIVO",
         revisadoPorId: user.id,

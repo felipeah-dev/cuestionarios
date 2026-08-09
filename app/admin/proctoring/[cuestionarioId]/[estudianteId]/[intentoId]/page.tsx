@@ -90,26 +90,45 @@ export default async function AdminProctoringIntentoDetailPage({
     notFound();
   }
 
-  // Determinar el título limpio del intento (ej: "Intento 1" o "Intento 1 (Reactivado)")
-  let tituloCarpeta = "Intento 1";
-  if (modo === "reactivado" || (intento.reactivadoEn && !modo)) {
-    tituloCarpeta = "Intento 1 (Reactivado)";
+  // Obtener fronteras de reactivación desde las alertas anuladas
+  const boundaries = [
+    ...new Set(
+      intento.alertasProctoring
+        .filter((a) => a.estadoRevision === "ANULADA_FALSO_POSITIVO" && a.revisadoEn)
+        .map((a) => new Date(a.revisadoEn!).getTime())
+    ),
+  ].sort((a, b) => a - b);
+
+  // Determinar qué sesión mostrar
+  let sessionIndex = 0;
+  if (modo?.startsWith("session-")) {
+    sessionIndex = parseInt(modo.replace("session-", ""), 10) || 0;
   } else if (modo === "original") {
-    tituloCarpeta = "Intento 1";
+    sessionIndex = 0;
+  } else if (modo === "reactivado") {
+    sessionIndex = boundaries.length > 0 ? boundaries.length : 0;
   }
 
-  // Filtrar evidencias según el modo seleccionado
+  // Generar título de la carpeta
+  let tituloCarpeta: string;
+  if (sessionIndex === 0) {
+    tituloCarpeta = "Intento 1";
+  } else {
+    tituloCarpeta = `Intento ${sessionIndex} (Reactivado)`;
+  }
+
+  // Filtrar evidencias según la sesión seleccionada
   let alertasProctoring = intento.alertasProctoring;
-  if (intento.reactivadoEn) {
-    if (modo === "original") {
-      alertasProctoring = intento.alertasProctoring.filter(
-        (a) => new Date(a.creadoEn) < new Date(intento.reactivadoEn!)
-      );
-    } else if (modo === "reactivado") {
-      alertasProctoring = intento.alertasProctoring.filter(
-        (a) => new Date(a.creadoEn) >= new Date(intento.reactivadoEn!)
-      );
-    }
+  if (boundaries.length > 0) {
+    const start = sessionIndex === 0 ? null : boundaries[sessionIndex - 1];
+    const end = sessionIndex < boundaries.length ? boundaries[sessionIndex] : null;
+
+    alertasProctoring = intento.alertasProctoring.filter((a) => {
+      const t = new Date(a.creadoEn).getTime();
+      if (start !== null && t < start) return false;
+      if (end !== null && t >= end) return false;
+      return true;
+    });
   }
 
   // Buscar un enlace a Drive de la evidencia para el botón superior principal

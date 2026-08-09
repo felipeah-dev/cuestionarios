@@ -11,6 +11,7 @@ type UploadBufferInput = {
   nombreAlumno: string;
   intentoNumero?: number;
   isReactivated?: boolean;
+  reactivationCount?: number;
 };
 
 export type DriveUploadResult = {
@@ -108,6 +109,7 @@ export async function uploadEvidenceBufferToDrive({
   nombreAlumno,
   intentoNumero = 1,
   isReactivated = false,
+  reactivationCount = 0,
 }: UploadBufferInput): Promise<DriveUploadResult | null> {
   try {
     const drive = getGoogleDriveClient();
@@ -131,9 +133,16 @@ export async function uploadEvidenceBufferToDrive({
       cuestionarioFolderId
     );
 
-    const intentoLabel = isReactivated
-      ? `Intento ${intentoNumero} (Reactivado)`
-      : `Intento ${intentoNumero}`;
+    // Nomenclatura: Intento 1, Intento 1 (Reactivado), Intento 2 (Reactivado), ...
+    let intentoLabel: string;
+    if (reactivationCount > 0) {
+      intentoLabel = `Intento ${reactivationCount} (Reactivado)`;
+    } else if (isReactivated) {
+      // Fallback por compatibilidad: si solo se pasó isReactivated sin reactivationCount
+      intentoLabel = `Intento ${intentoNumero} (Reactivado)`;
+    } else {
+      intentoLabel = `Intento ${intentoNumero}`;
+    }
 
     const intentoFolderId = await getOrCreateFolder(
       drive,

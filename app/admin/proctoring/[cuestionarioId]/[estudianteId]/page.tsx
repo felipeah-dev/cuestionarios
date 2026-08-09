@@ -78,6 +78,7 @@ export default async function AdminProctoringEstudiantePage({ params }: Props) {
           id: true,
           estadoRevision: true,
           creadoEn: true,
+          revisadoEn: true,
         },
       },
     },
@@ -101,77 +102,17 @@ export default async function AdminProctoringEstudiantePage({ params }: Props) {
   intentos.forEach((intento, index) => {
     const numIntento = index + 1;
 
-    if (intento.reactivadoEn) {
-      // 1. Evidencias ANTERIORES a la reactivación (Intento original)
-      const alertasOriginales = intento.alertasProctoring.filter(
-        (a) => new Date(a.creadoEn) < new Date(intento.reactivadoEn!)
-      );
+    // Obtener fronteras de reactivación: los distintos revisadoEn de alertas anuladas
+    const boundaries = [
+      ...new Set(
+        intento.alertasProctoring
+          .filter((a) => a.estadoRevision === "ANULADA_FALSO_POSITIVO" && a.revisadoEn)
+          .map((a) => new Date(a.revisadoEn!).getTime())
+      ),
+    ].sort((a, b) => a - b);
 
-      if (alertasOriginales.length > 0) {
-        folderCards.push({
-          idKey: `${intento.id}-original`,
-          intentoId: intento.id,
-          label: `Intento ${numIntento}`,
-          modoParam: "original",
-          alertasCount: alertasOriginales.length,
-          alertasPendientes: alertasOriginales.filter((a) => a.estadoRevision === "PENDIENTE").length,
-          ultimaEvidencia: alertasOriginales[0]?.creadoEn ? new Date(alertasOriginales[0].creadoEn) : undefined,
-          estadoBadge: (
-            <Badge className="bg-destructive/10 text-destructive border-destructive/20 font-bold">
-              <AlertTriangle className="h-3.5 w-3.5 mr-1" />
-              Examen Bloqueado (Pre-Reactivación)
-            </Badge>
-          ),
-        });
-      }
-
-      // 2. Evidencias POSTERIORES a la reactivación (Intento Reactivado)
-      const alertasReactivadas = intento.alertasProctoring.filter(
-        (a) => new Date(a.creadoEn) >= new Date(intento.reactivadoEn!)
-      );
-
-      let estadoReactivadoBadge = (
-        <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold">
-          <RotateCcw className="h-3.5 w-3.5 mr-1" />
-          Reactivado por Profesor
-        </Badge>
-      );
-
-      if (intento.estado === "PAUSADO_REVISION_IA") {
-        estadoReactivadoBadge = (
-          <Badge className="bg-destructive/10 text-destructive border-destructive/20 font-bold">
-            <AlertTriangle className="h-3.5 w-3.5 mr-1" />
-            Examen Bloqueado (Pausado por IA)
-          </Badge>
-        );
-      } else if (intento.estado === "CANCELADO_CONFIRMADO") {
-        estadoReactivadoBadge = (
-          <Badge className="bg-destructive text-destructive-foreground font-bold">
-            <XCircle className="h-3.5 w-3.5 mr-1" />
-            Cancelado por Irregularidad
-          </Badge>
-        );
-      } else if (intento.estado === "ENVIADO" || intento.estado === "CALIFICADO") {
-        estadoReactivadoBadge = (
-          <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold">
-            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-            Examen Entregado (Con Advertencia)
-          </Badge>
-        );
-      }
-
-      folderCards.push({
-        idKey: `${intento.id}-reactivado`,
-        intentoId: intento.id,
-        label: `Intento ${numIntento} (Reactivado)`,
-        modoParam: "reactivado",
-        alertasCount: alertasReactivadas.length,
-        alertasPendientes: alertasReactivadas.filter((a) => a.estadoRevision === "PENDIENTE").length,
-        ultimaEvidencia: alertasReactivadas[0]?.creadoEn ? new Date(alertasReactivadas[0].creadoEn) : undefined,
-        estadoBadge: estadoReactivadoBadge,
-      });
-    } else {
-      // Intento sin reactivar (Normal)
+    if (boundaries.length === 0) {
+      // Sin reactivaciones — carpeta única normal
       const alertasPendientes = intento.alertasProctoring.filter(
         (a) => a.estadoRevision === "PENDIENTE"
       );
@@ -201,13 +142,13 @@ export default async function AdminProctoringEstudiantePage({ params }: Props) {
         estadoBadge = (
           <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold">
             <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-            Examen Entregado (Con Advertencia)
+            Examen Entregado
           </Badge>
         );
       }
 
       folderCards.push({
-        idKey: intento.id,
+        idKey: `${intento.id}-normal`,
         intentoId: intento.id,
         label: `Intento ${numIntento}`,
         alertasCount: intento.alertasProctoring.length,
@@ -215,6 +156,95 @@ export default async function AdminProctoringEstudiantePage({ params }: Props) {
         ultimaEvidencia: ultimaAlerta?.creadoEn ? new Date(ultimaAlerta.creadoEn) : undefined,
         estadoBadge,
       });
+    } else {
+      // Hay reactivaciones — crear carpeta por cada sesión
+      // Sesión 0: alertas antes de la primera frontera → "Intento 1"
+      // Sesión 1: alertas entre frontera 1 y 2 → "Intento 1 (Reactivado)"
+      // Sesión 2: alertas entre frontera 2 y 3 → "Intento 2 (Reactivado)"
+      // Sesión N: alertas después de la última frontera → sesión actual (pendientes)
+
+      for (let i = 0; i <= boundaries.length; i++) {
+        const start = i === 0 ? null : boundaries[i - 1];
+        const end = i < boundaries.length ? boundaries[i] : null;
+
+        const sessionAlertas = intento.alertasProctoring.filter((a) => {
+          const t = new Date(a.creadoEn).getTime();
+          if (start !== null && t < start) return false;
+          if (end !== null && t >= end) return false;
+          return true;
+        });
+
+        if (sessionAlertas.length === 0) continue;
+
+        // Nomenclatura: Intento 1, Intento 1 (Reactivado), Intento 2 (Reactivado), ...
+        const isOriginal = i === 0;
+        const label = isOriginal
+          ? `Intento ${numIntento}`
+          : `Intento ${numIntento + i - 1} (Reactivado)`;
+        const modoParam = `session-${i}`;
+
+        // Determinar badge según si es sesión histórica o la actual
+        const isCurrentSession = i === boundaries.length;
+        let estadoBadge: React.ReactNode;
+
+        if (!isCurrentSession) {
+          // Sesión histórica (ya fue anulada/reactivada)
+          estadoBadge = (
+            <Badge className="bg-destructive/10 text-destructive border-destructive/20 font-bold">
+              <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+              Examen Bloqueado (Pre-Reactivación)
+            </Badge>
+          );
+        } else {
+          // Sesión actual
+          if (intento.estado === "PAUSADO_REVISION_IA") {
+            estadoBadge = (
+              <Badge className="bg-destructive/10 text-destructive border-destructive/20 font-bold">
+                <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                Examen Bloqueado (Pausado por IA)
+              </Badge>
+            );
+          } else if (intento.estado === "CANCELADO_CONFIRMADO") {
+            estadoBadge = (
+              <Badge className="bg-destructive text-destructive-foreground font-bold">
+                <XCircle className="h-3.5 w-3.5 mr-1" />
+                Cancelado por Irregularidad
+              </Badge>
+            );
+          } else if (intento.estado === "REACTIVADO_POR_ADMIN") {
+            estadoBadge = (
+              <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold">
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                Reactivado por Profesor
+              </Badge>
+            );
+          } else if (intento.estado === "ENVIADO" || intento.estado === "CALIFICADO") {
+            estadoBadge = (
+              <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold">
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                Examen Entregado (Con Advertencia)
+              </Badge>
+            );
+          } else {
+            estadoBadge = (
+              <Badge variant="outline" className="bg-secondary text-muted-foreground">
+                En Progreso
+              </Badge>
+            );
+          }
+        }
+
+        folderCards.push({
+          idKey: `${intento.id}-session-${i}`,
+          intentoId: intento.id,
+          label,
+          modoParam,
+          alertasCount: sessionAlertas.length,
+          alertasPendientes: sessionAlertas.filter((a) => a.estadoRevision === "PENDIENTE").length,
+          ultimaEvidencia: sessionAlertas[0]?.creadoEn ? new Date(sessionAlertas[0].creadoEn) : undefined,
+          estadoBadge,
+        });
+      }
     }
   });
 
